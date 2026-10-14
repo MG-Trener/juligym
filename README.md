@@ -54,6 +54,14 @@
 
 Кнопка «Скачать копию плана» сохраняет JSON с расписанием, упражнениями, отметками и историей; «Восстановить копию» проверяет файл и после подтверждения заменяет настройки. Очистка данных сайта, приватный режим или автоматическое освобождение хранилища браузером могут удалить локальные данные — резервная копия позволяет вернуть план. Она не включает изображения: сам сайт при необходимости загружается заново с интернетом.
 
+Кнопка **«Установить приложение»** доступна в шапке и внизу страницы. В поддерживаемых браузерах открывается системное окно установки; иначе показывается инструкция для устройства. На iPhone/iPad: Safari → «Поделиться» → «На экран Домой». В установленной версии кнопка скрывается. Добавлены Apple Touch Icon, режим standalone, ярлык перехода к тренировке, отступы safe area и мобильные элементы управления без запрета масштабирования.
+
+## Звуковые таймеры
+
+Таймеры отдыха и растяжки подают тихий сигнал каждую секунду, последние пять секунд — более заметный, по завершении — три ноты. Звук синтезируется локально через Web Audio и работает офлайн. Кнопка «Звук включён / выключен» запоминает выбор в этом браузере (`juligym:timer-sound`). Загрузка страницы сама звук не запускает: аудио включается после нажатия пользователя. Пауза, закрытие и смена длительности отменяют запланированные сигналы.
+
+Во время работающего таймера запрашивается Screen Wake Lock, если браузер его поддерживает. При паузе и завершении блокировка снимается. При ручной блокировке телефона или сворачивании приложения ОС может остановить звук; фоновые звуковые уведомления не гарантируются. При возвращении время пересчитывается по часам, без проигрывания пропущенных секунд.
+
 Обновление загружается целиком и предлагается кнопкой «Обновить сайт»; текущая версия остаётся доступна до завершения загрузки. Неудачная загрузка не заменяет работающую офлайн-копию. Service worker ограничен каталогом сайта, поэтому не очищает кэши других приложений на том же домене.
 
 ## Запуск
@@ -77,6 +85,7 @@ node scripts/browser-check.cjs
 node scripts/planner-check.cjs
 node scripts/stretch-check.cjs
 node scripts/offline-check.cjs
+node scripts/pwa-mobile-check.cjs
 ```
 
 Playwright должен быть доступен в окружении. Альтернативно задайте `PLAYWRIGHT_MODULE` — путь к установленному модулю, и `BROWSER_CHANNEL=msedge` или `chrome` для установленного браузера. `SITE_URL` позволяет проверить развёрнутый сайт. Проверка работает в изолированном браузерном профиле, не затрагивая данные пользователя. Скриншоты и пробная печать сохраняются в игнорируемый каталог `artifacts/`.
@@ -97,6 +106,8 @@ GitHub Pages публикует корень ветки `main`; `.nojekyll` от
 - `mgym.css` — тема MGym и компактный вид библиотеки.
 - `offline.js`, `sw.js`, `manifest.webmanifest` — офлайн-копия, обновления и установка.
 - `backup.js` — проверка и восстановление копии плана.
+- `pwa.js`, `mobile.css` — установка приложения и мобильная адаптация.
+- `timer-audio.js` — звуковой отсчёт и удержание экрана включённым во время таймера.
 - `assets/exercises/` — итоговые WebP-иллюстрации.
 - `assets/fonts/` — Golos Text и лицензия SIL Open Font License.
 - `docs/image-prompts.md` — полный набор промптов и правок для иллюстраций.
@@ -111,3 +122,5 @@ GitHub Pages публикует корень ветки `main`; `.nojekyll` от
 Для растяжки использованы общие ориентиры [NHS: How to stretch after exercising](https://www.nhs.uk/live-well/exercise/how-to-stretch-after-exercising/) и [Mayo Clinic: Stretching](https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/stretching/art-20047931): разогретые мышцы, мягкое натяжение без боли и пружинящих движений, спокойное дыхание. Подборка по мышцам — правило интерфейса, а не индивидуальное назначение.
 
 При расширении каталога сверены [ACE Exercise Library](https://www.acefitness.org/resources/everyone/exercise-library/) и [NASM Exercise Library](https://www.nasm.org/resource-center/exercise-library). Техническая основа офлайн-режима: [MDN Service Workers](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers) и [MDN Caching](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Caching).
+
+Установка и звук: [MDN Making PWAs installable](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable), [Web Audio best practices](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices), [Screen Wake Lock](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API).

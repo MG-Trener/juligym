@@ -1,7 +1,7 @@
 import {initialPlanner} from './planner.js';
 import {createBackup,parseBackup} from './backup.js';
 const $=s=>document.querySelector(s),KEY='juligym:v1';
-let registration,installPrompt,refreshing=false,prepared=false;
+let registration,refreshing=false,prepared=false;
 function status(title,detail){$('#offline-status').textContent=title;if(detail)$('#offline-detail').textContent=detail;}
 function ready(){prepared=true;$('#offline-retry').hidden=true;status(navigator.onLine?'Сайт сохранён для работы без интернета':'Офлайн · сайт сохранён','Библиотека и картинки доступны без сети. Ваш план и отметки сохраняются в этом браузере после перезагрузки компьютера.');}
 function failed(){if(prepared)return;status('Офлайн-копия пока не готова','Оставьте страницу открытой с интернетом и повторите загрузку. Настройки плана сохраняются независимо от загрузки картинок.');$('#offline-retry').hidden=false;}
@@ -21,9 +21,6 @@ if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('contro
 $('#offline-retry').addEventListener('click',register);
 $('#app-update').addEventListener('click',()=>{if(registration?.waiting){refreshing=true;registration.waiting.postMessage({type:'ACTIVATE_UPDATE'});}});
 addEventListener('online',()=>{if(prepared)ready();else register();});addEventListener('offline',()=>{if(prepared)ready();});
-addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('#app-install').hidden=false;});
-$('#app-install').addEventListener('click',async()=>{if(!installPrompt)return;await installPrompt.prompt();const choice=await installPrompt.userChoice;if(choice.outcome==='accepted'){navigator.storage?.persist?.().catch(()=>{});$('#app-install').hidden=true;}installPrompt=null;});
-addEventListener('appinstalled',()=>{$('#app-install').hidden=true;status('Приложение установлено на устройстве');});
 $('#backup-export').addEventListener('click',()=>{
  try{
   const data=JSON.parse(localStorage.getItem(KEY)) || {...initialPlanner(),mode:'easy',sessions:{},history:[]};

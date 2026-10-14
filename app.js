@@ -1,3 +1,4 @@
+import {createTimerAudio,createTimerWakeLock} from './timer-audio.js';
 import { exercises, days as templates, totalSets } from './exercises.js';
 import { stretches, stretchGroups, stretchRecommendations, stretchMatches, updateStretches } from './stretches.js';
 import { initialPlanner, groups, weekdays, shorts, resizeSchedule, recommendations, hasAdjacentDays, updateItems } from './planner.js';
@@ -343,11 +344,15 @@ document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('c
 
 let deadline = 0, remaining = 0, running = false, interval;
 let timerKind='rest',timerTitle='',timerDuration=60;
+const timerAudio=createTimerAudio(message=>toast(message)),keepScreenAwake=createTimerWakeLock();
+function renderSound(){const button=$('#timer-sound');button.textContent=timerAudio.enabled?'Звук включён':'Звук выключен';button.setAttribute('aria-pressed',String(timerAudio.enabled));}
+renderSound();
+$('#timer-sound').addEventListener('click',()=>{timerAudio.setEnabled(!timerAudio.enabled);renderSound();if(running && timerAudio.enabled)timerAudio.start(Math.max(0,(deadline-Date.now())/1000));});
 function displayTimer() {
   if (running) remaining = Math.max(0,Math.ceil((deadline-Date.now())/1000));
   $('#timer-value').textContent = `${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
   if (running && remaining === 0) {
-    running = false; clearInterval(interval); $('#timer-label').textContent = timerKind==='stretch'?'УДЕРЖАНИЕ ЗАВЕРШЕНО':'ОТДЫХ ЗАВЕРШЁН';
+    running = false; clearInterval(interval);timerAudio.finish();keepScreenAwake(false); $('#timer-label').textContent = timerKind==='stretch'?'УДЕРЖАНИЕ ЗАВЕРШЕНО':'ОТДЫХ ЗАВЕРШЁН';
     $('#timer-toggle').textContent = '↻'; $('#timer-toggle').setAttribute('aria-label',`Повторить ${timerDuration} секунд`); toast(timerKind==='stretch'?timerTitle:'Отдых завершён. Продолжайте, когда будете готовы.');
   }
 }
@@ -358,16 +363,16 @@ function startTimer(seconds,kind='rest',title='') {
   remaining = seconds; deadline = Date.now()+seconds*1000; running=true;
   $('#timer').hidden = false; $('#timer-label').textContent = kind==='stretch'?'МЯГКАЯ РАСТЯЖКА · УДЕРЖАНИЕ':'ОТДЫХ МЕЖДУ ПОДХОДАМИ';
   $('#timer-toggle').textContent = 'Ⅱ'; $('#timer-toggle').setAttribute('aria-label','Приостановить таймер');
-  clearInterval(interval);interval=setInterval(displayTimer,250);displayTimer();
+  timerAudio.start(seconds);keepScreenAwake(true);clearInterval(interval);interval=setInterval(displayTimer,250);displayTimer();
 }
-function stopTimer() { clearInterval(interval);running=false;$('#timer').hidden=true; }
+function stopTimer() { clearInterval(interval);running=false;timerAudio.cancel();keepScreenAwake(false);$('#timer').hidden=true; }
 $('#timer-close').addEventListener('click',stopTimer);
 $('#timer-toggle').addEventListener('click',()=>{
   if (remaining === 0) return startTimer(timerDuration,timerKind,timerTitle);
-  if (running) { displayTimer();running=false;clearInterval(interval);$('#timer-label').textContent='ТАЙМЕР НА ПАУЗЕ';$('#timer-toggle').textContent='▶';$('#timer-toggle').setAttribute('aria-label','Продолжить таймер'); }
+  if (running) { displayTimer();if(!running)return;running=false;timerAudio.cancel();keepScreenAwake(false);clearInterval(interval);$('#timer-label').textContent='ТАЙМЕР НА ПАУЗЕ';$('#timer-toggle').textContent='▶';$('#timer-toggle').setAttribute('aria-label','Продолжить таймер'); }
   else {const duration=timerDuration;startTimer(remaining,timerKind,timerTitle);timerDuration=duration;}
 });
-document.addEventListener('visibilitychange',()=>{if(running)displayTimer();});
+document.addEventListener('visibilitychange',()=>{if(running){displayTimer();if(running && document.visibilityState==='visible')timerAudio.start(Math.max(0,(deadline-Date.now())/1000));}});
 
 function printStretches(plan) {
   if(!plan.stretches.length)return '';
