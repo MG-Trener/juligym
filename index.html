@@ -11,11 +11,13 @@
   <meta name="description" content="Библиотека домашних упражнений по мышцам: соберите свои комплексы, выберите дни недели и следуйте понятным иллюстрациям и подсказкам.">
   <title>Моя домашняя тренировка</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <script src="./theme.js"></script>
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./planner.css">
   <link rel="stylesheet" href="./stretch.css">
   <link rel="stylesheet" href="./mgym.css">
   <link rel="stylesheet" href="./mobile.css">
+  <link rel="stylesheet" href="./themes.css">
   <script type="module" src="./pwa.js"></script>
   <link rel="manifest" href="./manifest.webmanifest">
   <script type="module" src="./offline.js"></script>
@@ -34,7 +36,7 @@
   <a class="skip-link" href="#workout">К упражнениям</a>
   <header class="topbar wrap">
     <a href="./" class="brand" aria-label="Моя домашняя тренировка — главная"><span class="brand-mark" aria-hidden="true">j.</span><span>моя домашняя<br><strong>тренировка</strong></span></a>
-    <div class="header-actions"><button class="button light small install-top" data-install>Установить приложение</button><span class="private-note"><span class="status-dot"></span> Место для себя</span><button class="button light small" id="guide-open">Как заниматься <span aria-hidden="true">↗</span></button></div>
+    <div class="header-actions"><label class="theme-choice" for="theme-select">Стиль <select id="theme-select"><option value="dark">Тёмный · MGym</option><option value="light">Светлый · прежний</option></select></label><span id="theme-status" class="sr-only" role="status"></span><button class="button light small install-top" data-install>Установить приложение</button><span class="private-note"><span class="status-dot"></span> Место для себя</span><button class="button light small" id="guide-open">Как заниматься <span aria-hidden="true">↗</span></button></div>
   </header>
   <main class="wrap">
     <section class="intro" aria-labelledby="page-title">
