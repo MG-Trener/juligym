@@ -1,4 +1,5 @@
 import { exercises } from './exercises.js';
+import { extraStretches } from './catalog-extra.js';
 
 export const stretches = {
   stretchquad: { title:'Передняя поверхность бедра', muscles:'Квадрицепс', targets:['quads'], side:true, seconds:20, equipment:'Стул или стена',
@@ -53,6 +54,8 @@ export const stretches = {
     easier:'Оставьте верхнюю руку на поясе и сделайте совсем маленький наклон.', avoid:'Не отрывайте таз от стула и не тянитесь через боль в спине.' }
 };
 
+Object.assign(stretches, extraStretches);
+
 export const stretchGroups = [
   {title:'Ноги',items:['stretchquad','stretchham','stretchcalf']},
   {title:'Ягодицы',items:['stretchglute']},
@@ -62,23 +65,33 @@ export const stretchGroups = [
   {title:'Руки',items:['stretchbiceps','stretchtriceps']},
   {title:'Мышцы корпуса',items:['stretchside']}
 ];
+for(const [id,e] of Object.entries(extraStretches))stretchGroups.find(g=>g.title===e.group).items.push(id);
 export const trainedMuscles = {
   squat:['quads','glutes'], bridge:['glutes','hamstrings'], wall:['chest','triceps','shoulders'],
   row:['back','biceps','shoulders'], heel:['core'], hinge:['hamstrings','glutes'],
-  press:['shoulders','triceps'], calf:['calves'], bird:['core','back','glutes'], side:['glutes'], curl:['biceps']
+  press:['shoulders','triceps'], calf:['calves'], bird:['core','back','glutes'], side:['glutes'], curl:['biceps'],
+  ...Object.fromEntries(Object.entries(exercises).filter(([,e])=>e.targets).map(([id,e])=>[id,e.targets]))
 };
 export function stretchMatches(id, strengthItems=[]) {
   const e=stretches[id];
   return e ? strengthItems.filter(item=>trainedMuscles[item]?.some(m=>e.targets.includes(m))) : [];
 }
 export function stretchRecommendations(strengthItems=[], included=[], limit=3) {
-  return Object.keys(stretches).filter(id=>!included.includes(id)).map(id=>{
+  const candidates=Object.keys(stretches).filter(id=>!included.includes(id)).map(id=>{
     const matches=stretchMatches(id,strengthItems);
     const score=matches.reduce((sum,item)=>sum+Math.max(...stretches[id].targets.map(m=>{
       const index=trainedMuscles[item].indexOf(m);return index<0?0:index===0?3:1;
     })),0);
     return {id,score,reason:'После: '+matches.map(item=>exercises[item].title).join(', ')};
-  }).filter(r=>r.score>0).sort((a,b)=>b.score-a.score).slice(0,limit);
+  }).filter(r=>r.score>0).sort((a,b)=>b.score-a.score);
+  const trained=new Set(strengthItems.flatMap(id=>trainedMuscles[id] || []));
+  const covered=new Set(included.flatMap(id=>stretches[id]?.targets || [])),result=[];
+  for(const item of candidates){
+    const targets=stretches[item.id].targets.filter(m=>trained.has(m));
+    if(!targets.some(m=>!covered.has(m)))continue;
+    result.push(item);targets.forEach(m=>covered.add(m));if(result.length>=limit)break;
+  }
+  return result;
 }
 export function updateStretches(state,planId,items) {
   const plan=state.plans.find(p=>p.id===planId);

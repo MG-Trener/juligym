@@ -12,7 +12,11 @@ export const groups = [
   { title: 'Руки', items: ['curl'] },
   { title: 'Мышцы корпуса', items: ['heel', 'bird'] }
 ];
-const patterns = { squat:'legs', calf:'calves', bridge:'hinge', hinge:'hinge', side:'hip', row:'pull', wall:'push', press:'push', curl:'arms', heel:'core', bird:'core' };
+for(const [id,e] of Object.entries(exercises)){
+  const group=groups.find(g=>g.title===e.group);
+  if(group && !group.items.includes(id))group.items.push(id);
+}
+const patterns = { squat:'legs', calf:'calves', bridge:'hinge', hinge:'hinge', side:'hip', row:'pull', wall:'push', press:'push', curl:'arms', heel:'core', bird:'core',...Object.fromEntries(Object.entries(exercises).filter(([,e])=>e.pattern).map(([id,e])=>[id,e.pattern])) };
 const reasons = { legs:'Добавляет работу передней поверхности бедра', calves:'Дополняет работу ног нагрузкой на икры', hinge:'Добавляет работу ягодиц и задней поверхности бедра', hip:'Дополняет тренировку боковой поверхности ягодиц', pull:'Добавляет тяговое движение для спины', push:'Добавляет жимовое движение для груди или плеч', arms:'Добавляет отдельную работу для рук', core:'Дополняет тренировку контролем корпуса' };
 const priorities = {
   squat:['row','wall','heel','bridge','press','bird','side','curl','calf','hinge'],
@@ -33,7 +37,7 @@ export function recommendations(selected, included = []) {
   const used = new Set([selected, ...included]);
   const covered = new Set([...used].map(id=>patterns[id]));
   const result = [];
-  const candidates = priorities[selected].filter(id=>!used.has(id));
+  const candidates = [...new Set([...(priorities[selected] || priorities.squat),...Object.keys(exercises)])].filter(id=>!used.has(id) && exercises[id].level!=='progress');
   while (result.length < 3 && candidates.length) {
     const index = Math.max(0, candidates.findIndex(id=>!covered.has(patterns[id])));
     const [id] = candidates.splice(index,1);

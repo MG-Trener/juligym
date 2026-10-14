@@ -5,8 +5,8 @@ import {stretches,stretchGroups,trainedMuscles,stretchRecommendations,stretchMat
 import {initialPlanner,updateItems} from '../planner.js';
 import {exercises} from '../exercises.js';
 
-test('Все группы покрыты: 10 иллюстрированных растяжек с секундами и техникой',()=>{
-  assert.equal(Object.keys(stretches).length,10);
+test('Все группы покрыты: 26 иллюстрированных растяжек с секундами и техникой',()=>{
+  assert.equal(Object.keys(stretches).length,26);
   assert.equal(stretchGroups.length,7);
   assert.deepEqual(stretchGroups.flatMap(g=>g.items).sort(),Object.keys(stretches).sort());
   for(const [id,e] of Object.entries(stretches)){

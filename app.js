@@ -29,6 +29,9 @@ const escape = value => String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'
 let selectedExercise = 'squat';
 let librarySearch = '';
 let libraryMode='strength';
+let previewOpen=false;
+const openGroups={strength:new Set(),stretch:new Set()};
+let equipmentFilter='all',levelFilter='all';
 const selectedByMode={strength:'squat',stretch:'stretchquad'};
 const allExercises={...exercises,...stretches};
 const setCount = () => state.mode === 'easy' ? 1 : 2;
@@ -44,7 +47,7 @@ function session() {
   return s;
 }
 function toast(message) { $('#toast').textContent = message; clearTimeout(toast.timeout); toast.timeout = setTimeout(() => { $('#toast').textContent = ''; }, 5000); }
-function phaseLabels(e) { return e.phases.map((p, i) => `<div class="phase-label"><b>${['01 · НАЧАЛО', '02 · ДВИЖЕНИЕ', e.seconds?'03 · УДЕРЖАНИЕ':'03 · КОНЕЧНАЯ ФАЗА'][i]}</b>${p}</div>`).join(''); }
+function phaseLabels(e) { return e.phases.map((p, i) => `<div class="phase-label"><b>${['01 · НАЧАЛО', '02 · ДВИЖЕНИЕ', (e.seconds || e.unit==='seconds')?'03 · УДЕРЖАНИЕ':'03 · КОНЕЧНАЯ ФАЗА'][i]}</b>${p}</div>`).join(''); }
 function asset(id) { return `./assets/exercises/${id}.webp`; }
 function weekStart(date = new Date()) {
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -79,19 +82,28 @@ function renderLibrary() {
   $('#library-target').textContent=activeDays().find(d=>d.id===state.day).weekday+(isStretch?' · после тренировки':'');
   const added=included.includes(selectedExercise);
   const action=isStretch?'data-add-stretch':'data-add';
-  const dose=isStretch?`1 × ${e.seconds} с${e.side?' на каждую сторону':''}`:`${setCount()} × ${state.mode==='easy'?e.easy:e.reps}${e.side?' на сторону':''} · отдых ${e.rest} с`;
+  const dose=isStretch?`1 × ${e.seconds} с${e.side?' на каждую сторону':''}`:`${setCount()} × ${state.mode==='easy'?e.easy:e.reps}${e.unit==='seconds'?' с':''}${e.side?' на сторону':''} · отдых ${e.rest} с`;
   const matched=isStretch?stretchMatches(selectedExercise,plan.items):[];
-  $('#library-selected').innerHTML=`<div class="library-preview"><button class="library-preview-image" data-image="${selectedExercise}" aria-label="Посмотреть технику: ${e.title}"><img src="${asset(selectedExercise)}" alt="Три фазы: ${e.title}"><span>Увеличить ↗</span></button><h3>${e.title}</h3><p>${e.cue}</p><div class="library-dose">${dose}</div>${isStretch?`<p class="stretch-match">${matched.length?'Подходит после: '+matched.map(id=>exercises[id].title).join(', '):'В текущем комплексе нет целевой нагрузки на эту группу. Можно выбрать вручную.'}</p>`:''}<button class="button primary library-add" ${action}="${selectedExercise}" ${added?'disabled':''}>${added?'✓ Уже в плане':isStretch?'+ Добавить после тренировки':'+ Добавить в тренировку'}</button></div><section class="recommendations" aria-label="Рекомендуемые дополнения"><h3>${isStretch?'Растяжка под вашу тренировку':'Хорошо дополнит'}</h3><p>${isStretch?'Выбраны мышцы из силовой части этого дня. Начните с 2–3 комфортных вариантов.':'Учитываем выбранное движение и состав тренировки. Это варианты, не обязательная нагрузка.'}</p>${rec.map(r=>`<div class="recommendation"><button data-select-exercise="${r.id}" class="recommendation-name">${catalog[r.id].title}<small>${r.reason}</small></button><button ${action}="${r.id}" class="recommendation-add" aria-label="Добавить: ${catalog[r.id].title}">+</button></div>`).join('')}${rec.length?`<button class="text-button" id="${isStretch?'add-stretch-recommendations':'add-recommendations'}">Добавить подборку (${rec.length}) ↗</button>`:`<p>${isStretch?(plan.items.length?'Все подходящие варианты уже добавлены.':'Сначала добавьте силовые упражнения — появится подборка по их мышцам.'):'Все доступные упражнения уже в комплексе. Дополнять его не требуется.'}</p>`}</section>`;
+  $('#library-selected').innerHTML=`<details class="library-detail" id="library-detail" ${previewOpen?'open':''}><summary><span>Выбрано: ${e.title}</span><b>⌄</b></summary><div class="library-preview"><button class="library-preview-image" data-image="${selectedExercise}" aria-label="Посмотреть технику: ${e.title}"><img src="${asset(selectedExercise)}" alt="Три фазы: ${e.title}"><span>Увеличить ↗</span></button><h3>${e.title}</h3><p>${e.cue}</p><div class="library-dose">${dose}</div><p class="level-note">${e.level==='progress'?'После освоения базы':'Начальный уровень'} · ${e.equipment}</p>${isStretch?`<p class="stretch-match">${matched.length?'Подходит после: '+matched.map(id=>exercises[id].title).join(', '):'В текущем комплексе нет целевой нагрузки на эту группу. Можно выбрать вручную.'}</p>`:''}<button class="button primary library-add" ${action}="${selectedExercise}" ${added?'disabled':''}>${added?'✓ Уже в плане':isStretch?'+ Добавить после тренировки':'+ Добавить в тренировку'}</button></div><section class="recommendations" aria-label="Рекомендуемые дополнения"><h3>${isStretch?'Растяжка под вашу тренировку':'Хорошо дополнит'}</h3><p>${isStretch?'Выбраны мышцы из силовой части этого дня. Начните с 2–3 комфортных вариантов.':'Учитываем выбранное движение и состав тренировки. Это варианты, не обязательная нагрузка.'}</p>${rec.map(r=>`<div class="recommendation"><button data-select-exercise="${r.id}" class="recommendation-name">${catalog[r.id].title}<small>${r.reason}</small></button><button ${action}="${r.id}" class="recommendation-add" aria-label="Добавить: ${catalog[r.id].title}">+</button></div>`).join('')}${rec.length?`<button class="text-button" id="${isStretch?'add-stretch-recommendations':'add-recommendations'}">Добавить подборку (${rec.length}) ↗</button>`:`<p>${isStretch?(plan.items.length?'Выбранная растяжка уже охватывает мышцы комплекса. Другие варианты доступны в группах ниже.':'Сначала добавьте силовые упражнения — появится подборка по их мышцам.'):'Базовые дополнения уже в комплексе. Другие варианты можно выбрать в библиотеке.'}</p>`}</section></details>`;
   const query=librarySearch.toLocaleLowerCase('ru').trim();let found=0;
   $('#library-groups').innerHTML=(isStretch?stretchGroups:groups).map(group=>{
-    const ids=group.items.filter(id=>(catalog[id].title+' '+catalog[id].muscles+' '+catalog[id].equipment+' '+group.title).toLocaleLowerCase('ru').includes(query));found+=ids.length;
-    return ids.length?`<details class="library-group" open><summary>${group.title}<span>${ids.length}</span></summary>${ids.map(id=>`<button class="library-item ${id===selectedExercise?'selected':''}" data-select-exercise="${id}" aria-pressed="${id===selectedExercise}"><img src="${asset(id)}" alt="" loading="lazy"><span><strong>${catalog[id].title}</strong><small>${catalog[id].muscles}${included.includes(id)?' · ✓ В плане':''}</small></span></button>`).join('')}</details>`:'';
-  }).join('') || '<p class="library-empty">Ничего не найдено. Попробуйте название мышцы.</p>';
-  $('#library-result-count').textContent=`${found} упражнений`;
+    const ids=group.items.filter(id=>{
+      const item=catalog[id],dumbbell=/гантел/i.test(item.equipment),support=/стул|стен|опор|ступень|стол/i.test(item.equipment);
+      return (item.title+' '+item.muscles+' '+item.equipment+' '+group.title).toLocaleLowerCase('ru').includes(query)
+        && (equipmentFilter==='all' || equipmentFilter==='dumbbell'&&dumbbell || equipmentFilter==='body'&&!dumbbell || equipmentFilter==='support'&&support)
+        && (isStretch || levelFilter==='all' || (item.level || 'start')===levelFilter);
+    });found+=ids.length;
+    return ids.length?`<details class="library-group" data-group="${group.title}" ${query || openGroups[libraryMode].has(group.title)?'open':''}><summary>${group.title}<span>${ids.length} <b>⌄</b></span></summary>${ids.map(id=>`<div class="library-row"><button class="library-item ${id===selectedExercise?'selected':''}" data-select-exercise="${id}" aria-pressed="${id===selectedExercise}"><img src="${asset(id)}" alt="" loading="lazy"><span><strong>${catalog[id].title}</strong><small>${catalog[id].level==='progress'?'После базы · ':''}${catalog[id].muscles}</small></span></button><button class="quick-add" ${action}="${id}" ${included.includes(id)?'disabled':''} aria-label="Добавить: ${catalog[id].title}">${included.includes(id)?'✓':'+'}</button></div>`).join('')}</details>`:'';
+  }).join('') || '<p class="library-empty">Ничего не найдено. Измените запрос или фильтры.</p>';
+  $('#library-result-count').textContent=`${found} из ${Object.keys(catalog).length}`;
+  $('#library-level').disabled=isStretch;
+  document.querySelectorAll('[data-library-mode]').forEach(b=>b.textContent=b.dataset.libraryMode==='strength'?`Силовые · ${Object.keys(exercises).length}`:`Растяжка · ${Object.keys(stretches).length}`);
+
 }
 function setLibraryMode(mode) {
   selectedByMode[libraryMode]=selectedExercise;libraryMode=mode;
-  selectedExercise=selectedByMode[mode];librarySearch='';$('#library-search').value='';renderLibrary();
+  equipmentFilter='all';levelFilter='all';$('#library-equipment').value='all';$('#library-level').value='all';
+  selectedExercise=selectedByMode[mode];previewOpen=false;librarySearch='';$('#library-search').value='';renderLibrary();
 }
 function addStretch(id) {
   if(!stretches[id] || currentDay().stretches.includes(id))return;
@@ -120,7 +132,7 @@ function openLibrary() {
   if(matchMedia('(max-width: 1000px)').matches) {
     panel.classList.add('is-open'); $('#library-backdrop').hidden=false;
     panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
-    document.querySelectorAll('body > header, body > main, body > footer').forEach(el=>el.inert=true);
+    document.querySelectorAll('body > header, body > main, body > footer, body > .offline-panel').forEach(el=>el.inert=true);
     document.body.classList.add('library-open');
     $('#library-close').focus();
   } else { $('#library-search').focus(); }
@@ -128,7 +140,7 @@ function openLibrary() {
 function closeLibrary() {
   $('#library').classList.remove('is-open');$('#library-backdrop').hidden=true;
   $('#library').removeAttribute('role');$('#library').removeAttribute('aria-modal');
-  document.querySelectorAll('body > header, body > main, body > footer').forEach(el=>el.inert=false);
+  document.querySelectorAll('body > header, body > main, body > footer, body > .offline-panel').forEach(el=>el.inert=false);
   document.body.classList.remove('library-open');
   $('#library-open').focus();
 }
@@ -138,9 +150,9 @@ function renderCard(id, index) {
   const complete = Array.from({length:setCount()},(_,i)=>`${id}:${i}`).every(k=>done.includes(k));
   return `<article class="exercise-card ${complete ? 'is-done' : ''}" id="exercise-${id}" aria-labelledby="title-${id}">
     <div class="card-header"><span class="exercise-index">${String(index+1).padStart(2,'0')}</span><div><h3 id="title-${id}">${e.title}</h3><p>${e.muscles}</p></div><span class="equipment">${e.equipment}</span></div><div class="exercise-edit"><button data-move="${id}" data-direction="-1" ${index===0?'disabled':''} aria-label="Выше: ${e.title}">↑</button><button data-move="${id}" data-direction="1" ${index===currentDay().items.length-1?'disabled':''} aria-label="Ниже: ${e.title}">↓</button><button data-remove="${id}" aria-label="Убрать: ${e.title}">Убрать ×</button></div>
-    <button class="exercise-visual ${['bridge','heel','bird'].includes(id) ? 'ground' : ''}" data-image="${id}" aria-label="Увеличить: ${e.title}, три фазы движения"><img src="${asset(id)}" alt="${e.title}: ${e.phases.join('; ')}. Коралловым выделены: ${e.muscles.toLowerCase()}." width="1536" height="1024" loading="${index < 2 ? 'eager' : 'lazy'}"><span class="zoom-icon" aria-hidden="true">⤢</span></button>
+    <button class="exercise-visual ${(['bridge','heel','bird'].includes(id) || e.equipment.includes('Коврик')) ? 'ground' : ''}" data-image="${id}" aria-label="Увеличить: ${e.title}, три фазы движения"><img src="${asset(id)}" alt="${e.title}: ${e.phases.join('; ')}. Коралловым выделены: ${e.muscles.toLowerCase()}." width="1536" height="1024" loading="${index < 2 ? 'eager' : 'lazy'}"><span class="zoom-icon" aria-hidden="true">⤢</span></button>
     <div class="phase-labels">${phaseLabels(e)}</div>
-    <div class="prescription"><span class="rep-value">${setCount()} × ${state.mode === 'easy' ? e.easy : e.reps}<span class="rep-unit">повторов</span></span>${e.side ? '<span class="rep-side">на каждую<br>сторону</span>' : ''}<button class="rest-button" data-rest="${e.rest}" aria-label="Запустить отдых ${e.rest} секунд">◷ ${e.rest} с отдыха</button></div>
+    <div class="prescription"><span class="rep-value">${setCount()} × ${state.mode === 'easy' ? e.easy : e.reps}<span class="rep-unit">${e.unit==='seconds'?'секунд':'повторов'}</span></span>${e.side ? '<span class="rep-side">на каждую<br>сторону</span>' : ''}<button class="rest-button" data-rest="${e.rest}" aria-label="Запустить отдых ${e.rest} секунд">◷ ${e.rest} с отдыха</button></div>
     <p class="cue"><span aria-hidden="true">↳</span>${e.cue}</p>
     <details class="technique"><summary>Техника и облегчённый вариант</summary><ol>${e.steps.map(s=>`<li>${s}</li>`).join('')}</ol><p><strong>Если тяжело:</strong> ${e.easier}</p><p><strong>Следите:</strong> ${e.avoid}</p></details>
     <div class="set-controls">${Array.from({length:setCount()},(_,i)=>`<button class="set-button" data-set="${id}:${i}" aria-label="${e.title}, подход ${i+1}" aria-pressed="${done.includes(`${id}:${i}`)}" ${session().finished ? 'disabled' : ''}>Подход ${i+1}</button>`).join('')}<span class="set-help">${complete ? 'Готово, отлично!' : 'Отметьте после выполнения'}</span></div>
@@ -191,7 +203,7 @@ document.addEventListener('click', event => {
     renderStretchSection();$(`[data-stretch-done="${id}"]`)?.focus({preventScroll:true});
   }
   if(button.dataset.stretchTimer){const e=stretches[button.dataset.stretchTimer];startTimer(e.seconds,'stretch',e.side?'Удержание завершено. Повторите с другой стороны.':'Удержание завершено. Плавно выйдите из положения.');}
-  if (button.dataset.selectExercise) { selectedExercise=button.dataset.selectExercise; selectedByMode[libraryMode]=selectedExercise; librarySearch=''; $('#library-search').value=''; renderLibrary(); $('#library-selected').scrollIntoView({block:'nearest'}); }
+  if (button.dataset.selectExercise) { previewOpen=true; selectedExercise=button.dataset.selectExercise; selectedByMode[libraryMode]=selectedExercise; librarySearch=''; $('#library-search').value=''; renderLibrary(); $('#library-selected').scrollIntoView({block:'nearest'}); }
   if (button.dataset.add) addExercise(button.dataset.add);
   if (button.id==='add-recommendations') {
     const ids=recommendations(selectedExercise,currentDay().items).map(r=>r.id);
@@ -219,9 +231,9 @@ document.addEventListener('click', event => {
     $('#large-image').src = asset(id); $('#large-image').alt = `${e.title}. ${e.phases.join('. ')}. ${e.seconds?'Растягиваемые':'Работающие'} мышцы: ${e.muscles}.`;
     $('#large-phases').innerHTML = phaseLabels(e); $('#image-cue').textContent = e.cue; $('#image-technique').innerHTML=`<summary>Подробная техника</summary><ol>${e.steps.map(step=>`<li>${step}</li>`).join('')}</ol><p><strong>Легче:</strong> ${e.easier}</p>`; openDialog('#image-dialog');
     $('#image-dialog .image-disclaimer').textContent=e.seconds?'Коралловым условно выделены растягиваемые мышцы. Не тянитесь через боль; плавно выходите из положения.':'Коралловым условно выделены работающие мышцы. После показанной фазы вернитесь в исходное положение по подсказке.';
-    $('#image-dialog [data-phase="2"]').textContent=e.seconds?'Удержание':'Конец';
+    $('#image-dialog [data-phase="2"]').textContent=(e.seconds || e.unit==='seconds')?'Удержание':'Конец';
     $('#image-stage').className = 'image-stage';
-    $('#image-stage').dataset.ground = String(['bridge','heel','bird'].includes(id));
+    $('#image-stage').dataset.ground = String((['bridge','heel','bird'].includes(id) || e.equipment.includes('Коврик')));
     $('#large-image').style.transform = '';
     document.querySelectorAll('[data-phase]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.phase==='all')));
   }
@@ -297,12 +309,22 @@ $('#week-assignments').addEventListener('change',event=>{
   if(!plan.items.length)openLibrary();
 });
 $('#library-search').addEventListener('input',event=>{librarySearch=event.target.value;renderLibrary();});
+$('#library-equipment').addEventListener('change',event=>{equipmentFilter=event.target.value;renderLibrary();});
+$('#library-level').addEventListener('change',event=>{levelFilter=event.target.value;renderLibrary();});
+$('#library').addEventListener('toggle',event=>{
+ if(event.target.id==='library-detail' && event.target.isConnected)previewOpen=event.target.open;
+ if(event.target.matches('.library-group') && event.target.isConnected && !librarySearch.trim()){
+  const name=event.target.dataset.group;
+  if(event.target.open)openGroups[libraryMode].add(name);else openGroups[libraryMode].delete(name);
+ }
+},true);
+
 $('#library-backdrop').addEventListener('click',closeLibrary);
 document.addEventListener('keydown',event=>{
   if(!$('#library').classList.contains('is-open') || document.querySelector('dialog[open]'))return;
   if(event.key==='Escape'){event.preventDefault();closeLibrary();}
   if(event.key==='Tab'){
-    const nodes=[...$('#library').querySelectorAll('button:not(:disabled),input,summary')].filter(el=>el.getClientRects().length);
+    const nodes=[...$('#library').querySelectorAll('button:not(:disabled),input,select:not(:disabled),summary')].filter(el=>el.getClientRects().length);
     const first=nodes[0],last=nodes.at(-1);
     if(!$('#library').contains(document.activeElement)){event.preventDefault();first.focus();}
     else if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
@@ -352,7 +374,7 @@ function printStretches(plan) {
   return `<div class="print-stretches"><h3>После силовой части: растяжка</h3><p>Мягкое натяжение без боли и пружинящих движений. Дышите свободно. Один раз по 20 секунд${plan.stretches.some(id=>stretches[id].side)?', в односторонних упражнениях — с каждой стороны':''}.</p>${plan.stretches.map(id=>{const e=stretches[id];return `<article class="print-exercise"><img src="${asset(id)}" alt="${e.title}"><div><h3>${e.title}</h3><p><strong>1 × ${e.seconds} секунд${e.side?' на сторону':''}</strong> · ${e.muscles}</p><p>${e.cue}</p><p>${e.steps[0]} ${e.steps[1]}</p></div></article>`;}).join('')}</div>`;
 }
 function preparePrint() {
-  $('#print-area').innerHTML = `<h1>Моя домашняя тренировка</h1><p>Ваше расписание: ${activeDays().map(d=>d.weekday).join(', ')}. Между нагрузкой на одну группу мышц оставляйте день отдыха.</p><p>Первые 2 недели — 1 подход каждого упражнения. Основной режим — 2 подхода при хорошем восстановлении. Сначала все подходы одного упражнения, затем следующее. Оставляйте запас 2–3 повтора. Выдох на усилии, возвращение плавное.</p><p>Разминка 5 минут: 2 минуты шага на месте; по минуте движений плечами и локтями, неглубоких приседаний с опорой, наклонов от таза и подъёмов на носки.</p>${activeDays().map((d,i)=>`<section class="${i ? 'print-day' : ''}"><h2>${d.weekday}. ${escape(d.title)}</h2><p>${d.items.length?'Ваш выбранный комплекс':'Комплекс пока пуст: добавьте упражнения из библиотеки.'}</p>${d.items.map((id,n)=>{const e=exercises[id];return `<article class="print-exercise"><img src="${asset(id)}" alt="${e.title}"><div><h3>${n+1}. ${e.title}</h3><p><strong>Старт: 1 × ${e.easy} · Основной: 2 × ${e.reps}${e.side?' на каждую сторону':''} · Отдых ${e.rest} с</strong></p><p>${e.muscles}.</p><p>${e.cue} ${e.steps[2]}</p><p>Легче: ${e.easier}</p></div></article>`;}).join('')}${printStretches(d)}<p class="print-note">Завершение: спокойно походите 2–3 минуты. При острой боли, головокружении, боли в груди или необычной одышке остановитесь. При известных ограничениях согласуйте занятия со специалистом.</p></section>`).join('')}`;
+  $('#print-area').innerHTML = `<h1>Моя домашняя тренировка</h1><p>Ваше расписание: ${activeDays().map(d=>d.weekday).join(', ')}. Между нагрузкой на одну группу мышц оставляйте день отдыха.</p><p>Первые 2 недели — 1 подход каждого упражнения. Основной режим — 2 подхода при хорошем восстановлении. Сначала все подходы одного упражнения, затем следующее. Оставляйте запас 2–3 повтора. Выдох на усилии, возвращение плавное.</p><p>Разминка 5 минут: 2 минуты шага на месте; по минуте движений плечами и локтями, неглубоких приседаний с опорой, наклонов от таза и подъёмов на носки.</p>${activeDays().map((d,i)=>`<section class="${i ? 'print-day' : ''}"><h2>${d.weekday}. ${escape(d.title)}</h2><p>${d.items.length?'Ваш выбранный комплекс':'Комплекс пока пуст: добавьте упражнения из библиотеки.'}</p>${d.items.map((id,n)=>{const e=exercises[id];return `<article class="print-exercise"><img src="${asset(id)}" alt="${e.title}"><div><h3>${n+1}. ${e.title}</h3><p><strong>Старт: 1 × ${e.easy}${e.unit==='seconds'?' с':''} · Основной: 2 × ${e.reps}${e.unit==='seconds'?' с':''}${e.side?' на каждую сторону':''} · Отдых ${e.rest} с</strong></p><p>${e.muscles}.</p><p>${e.cue} ${e.steps[2]}</p><p>Легче: ${e.easier}</p></div></article>`;}).join('')}${printStretches(d)}<p class="print-note">Завершение: спокойно походите 2–3 минуты. При острой боли, головокружении, боли в груди или необычной одышке остановитесь. При известных ограничениях согласуйте занятия со специалистом.</p></section>`).join('')}`;
 }
 $('#print-button').addEventListener('click',async()=>{
   preparePrint();

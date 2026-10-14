@@ -10,7 +10,7 @@ const fs=require('node:fs/promises');
   const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('juligym:v1')));
   await page.locator('[data-library-mode=stretch]').click();
   assert.equal(await page.locator('.library-group').count(),7);
-  assert.equal(await page.locator('.library-item').count(),10);
+  assert.equal(await page.locator('.library-item').count(),26);
   assert.equal(await page.locator('.recommendation').count(),3);
   await page.locator('#library-search').fill('бицепс');
   assert.equal(await page.locator('.library-item').count(),1);

@@ -1,0 +1,58 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const path=require('node:path');
+(async()=>{
+ await fs.mkdir('artifacts',{recursive:true});
+ const profile=await fs.mkdtemp(path.resolve('artifacts/offline-profile-'));
+ const options={headless:true,channel:process.env.BROWSER_CHANNEL || 'msedge',viewport:{width:1440,height:1000}};
+ const url=process.env.SITE_URL || 'http://127.0.0.1:4173/';
+ let context=await chromium.launchPersistentContext(profile,options);
+ try{
+  let page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(url,{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>navigator.serviceWorker.controller && document.querySelector('#offline-status').textContent.includes('сохранён'),{},{timeout:120000});
+  assert.equal(await page.locator('.library-item').count(),46);
+  assert.equal(await page.locator('.library-group[open]').count(),0);
+  await page.selectOption('#library-equipment','dumbbell');
+  assert.ok(await page.locator('.library-item').count()>10);
+  assert.equal(await page.locator('.library-item[data-select-exercise=wall]').count(),0);
+  await page.selectOption('#library-level','start');
+  assert.equal(await page.locator('.library-item[data-select-exercise=goblet]').count(),0);
+  await page.selectOption('#library-level','all');await page.locator('#library-search').fill('гантелью у груди');
+  await page.locator('.quick-add[data-add=goblet]').click();
+  assert.equal(await page.locator('.quick-add[data-add=goblet]').isDisabled(),true);
+  await page.locator('[data-library-mode=stretch]').click();
+  assert.equal(await page.locator('.library-item').count(),26);
+  assert.equal(await page.locator('#library-equipment').inputValue(),'all');
+  await page.locator('#library-search').fill('сгибатели бедра');
+  await page.locator('.quick-add[data-add-stretch=stretchhipflexor]').click();
+  await page.selectOption('#week-count','4');
+  await page.locator('#plan-name').fill('Мой сохранённый план');await page.locator('#plan-name').press('Tab');
+  await page.locator('[data-set="goblet:0"]').click();await page.locator('[data-stretch-done=stretchhipflexor]').click();
+  const before=await page.evaluate(()=>localStorage.getItem('juligym:v1'));
+  const download=page.waitForEvent('download');await page.locator('#backup-export').click();
+  const file=await download;const backup=JSON.parse(await fs.readFile(await file.path(),'utf8'));assert.equal(backup.app,'juligym');
+  await page.locator('#plan-name').fill('Временное имя');await page.locator('#plan-name').press('Tab');
+  page.once('dialog',d=>d.accept());await page.locator('#backup-file').setInputFiles({name:'plan.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
+  await page.waitForFunction(()=>document.querySelector('#plan-name').value==='Мой сохранённый план');
+  assert.deepEqual(JSON.parse(await page.evaluate(()=>localStorage.getItem('juligym:v1'))),JSON.parse(before));
+  await context.close();context=await chromium.launchPersistentContext(profile,options);
+  await context.setOffline(true);page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(url,{waitUntil:'load'});
+  assert.equal(await page.locator('#plan-name').inputValue(),'Мой сохранённый план');
+  assert.equal(await page.locator('[role=tab]').count(),4);
+  assert.equal(await page.locator('[data-set="goblet:0"]').getAttribute('aria-pressed'),'true');
+  assert.equal(await page.locator('[data-stretch-done=stretchhipflexor]').getAttribute('aria-pressed'),'true');
+  const decoded=await page.evaluate(async()=>{
+   const root=new URL('.',location.href),{exercises}=await import('./exercises.js'),{stretches}=await import('./stretches.js');
+   return Promise.all(Object.keys({...exercises,...stretches}).map(async id=>{const img=new Image();img.src=new URL(`assets/exercises/${id}.webp`,root);await img.decode();return id;}));
+  });assert.equal(decoded.length,72);
+  await page.locator('#library-search').fill('планка');await page.locator('.quick-add[data-add=kneeplank]').click();
+  assert.match(await page.locator('#exercise-kneeplank .rep-unit').innerText(),/сек/);
+  await page.reload();assert.equal(await page.locator('#exercise-kneeplank').count(),1);
+  await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'artifacts/offline-desktop.png'});
+  assert.deepEqual(errors,[]);
+  console.log('PASS: 72 images offline after full browser restart; plan, schedule, strength/stretch marks preserved; backup roundtrip; filters, quick add, isometric seconds.');
+ }finally{await context.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

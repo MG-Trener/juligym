@@ -1,3 +1,4 @@
+import { extraExercises } from './catalog-extra.js';
 export const exercises = {
   squat: {
     title: 'Приседание до стула', muscles: 'Передняя поверхность бедра · ягодицы', equipment: 'Свой вес + стул', reps: '8–10', easy: '5–8', rest: 60,
@@ -88,6 +89,8 @@ export const exercises = {
     avoid: 'Не отклоняйтесь назад и не бросайте гантели вниз.'
   }
 };
+
+Object.assign(exercises, extraExercises);
 
 export const days = [
   { id: 1, weekday: 'Понедельник', short: 'ПН', title: 'Ноги и ягодицы', subtitle: 'Начинаем с опоры', description: 'Ноги и ягодицы задают основу. Добавляем тягу, мягкий жим и контроль корпуса.', items: ['squat', 'bridge', 'wall', 'row', 'heel'] },
