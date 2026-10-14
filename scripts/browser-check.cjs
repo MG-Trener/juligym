@@ -23,12 +23,12 @@ const assert = require('node:assert/strict');
   assert.equal(await page.locator('#timer-value').textContent(), paused);
   await page.reload();
   assert.equal(await page.getByRole('button',{name:'Приседание до стула, подход 1',exact:true}).getAttribute('aria-pressed'),'true');
-  await page.getByRole('tab',{name:/ДЕНЬ 2/}).click();
+  await page.locator('#tab-2').click();
   assert.equal(await page.locator('.set-button[aria-pressed=true]').count(),0);
   assert.match(await page.locator('#day-panel').innerText(),/Наклон с гантелями/);
-  await page.getByRole('tab',{name:/ДЕНЬ 3/}).click();
+  await page.locator('#tab-3').click();
   assert.match(await page.locator('#day-panel').innerText(),/Сгибание рук/);
-  await page.getByRole('tab',{name:/ДЕНЬ 1/}).click();
+  await page.locator('#tab-1').click();
   await page.selectOption('#mode','regular');
   assert.equal(await page.locator('.set-button').count(),10);
   assert.equal(await page.locator('.set-button[aria-pressed=true]').count(),0);
@@ -58,10 +58,10 @@ const assert = require('node:assert/strict');
   await page.getByRole('button',{name:'Все фазы',exact:true}).click();
   assert.equal(await page.locator('#image-stage').evaluate(el=>el.classList.contains('zoomed')),false);
   await page.keyboard.press('Escape');
-  await page.getByRole('tab',{name:/ДЕНЬ 1/}).focus();
+  await page.locator('#tab-1').focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('#tab-2').getAttribute('aria-selected'),'true');
-  await page.getByRole('tab',{name:/ДЕНЬ 1/}).click();
+  await page.locator('#tab-1').click();
   for (const width of [390,320,768]) {
     await page.setViewportSize({width,height:844});
     for(const day of [1,2,3]) {

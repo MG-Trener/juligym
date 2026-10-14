@@ -1,4 +1,5 @@
-import { exercises, days, totalSets } from './exercises.js';
+import { exercises, days as templates, totalSets } from './exercises.js';
+import { initialPlanner, groups, weekdays, shorts, resizeSchedule, recommendations, hasAdjacentDays, updateItems } from './planner.js';
 
 const $ = selector => document.querySelector(selector);
 const KEY = 'juligym:v1';
@@ -12,16 +13,20 @@ function readState() {
 }
 const stored = readState();
 const state = {
-  day: [1, 2, 3].includes(stored.day) ? stored.day : 1,
+  ...initialPlanner(stored),
   mode: stored.mode === 'regular' ? 'regular' : 'easy',
   sessions: stored.sessions && typeof stored.sessions === 'object' && !Array.isArray(stored.sessions) ? stored.sessions : {},
-  history: Array.isArray(stored.history) ? stored.history.filter(x => x && [1,2,3].includes(x.day) && typeof x.date === 'string').slice(-100) : []
+  history: Array.isArray(stored.history) ? stored.history.filter(x => x && [1,2,3,4,5,6,7].includes(x.day) && typeof x.date === 'string').slice(-100) : []
 };
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
   catch { if (storageAvailable) toast('Браузер не разрешает сохранение. Отметки останутся до закрытия страницы.'); storageAvailable = false; }
 }
-const currentDay = () => days.find(d => d.id === state.day);
+const currentDay = () => state.plans.find(d => d.id === state.day);
+const activeDays = () => state.schedule.map(s=>({...state.plans.find(p=>p.id===s.planId), weekday:weekdays[s.weekday], short:shorts[s.weekday]}));
+const escape = value => String(value).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let selectedExercise = 'squat';
+let librarySearch = '';
 const setCount = () => state.mode === 'easy' ? 1 : 2;
 const sessionKey = () => `${state.day}:${state.mode}`;
 function session() {
@@ -30,7 +35,7 @@ function session() {
   const s = state.sessions[key];
   const allowed = currentDay().items.flatMap(id => Array.from({ length:setCount() }, (_, i) => `${id}:${i}`));
   s.done = Array.isArray(s.done) ? [...new Set(s.done.filter(x => allowed.includes(x)))] : [];
-  s.finished = s.finished === true && s.done.length === allowed.length;
+  s.finished = s.finished === true && allowed.length > 0 && s.done.length === allowed.length;
   return s;
 }
 function toast(message) { $('#toast').textContent = message; clearTimeout(toast.timeout); toast.timeout = setTimeout(() => { $('#toast').textContent = ''; }, 5000); }
@@ -42,22 +47,70 @@ function weekStart(date = new Date()) {
   return start;
 }
 function renderWeek() {
+  $('#week-count').value = state.schedule.length;
   const since = weekStart().getTime();
-  const completed = new Set(state.history.filter(h => new Date(h.date).getTime() >= since).map(h => h.day));
-  $('#week-strip').innerHTML = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map((label, i) => {
-    const day = i === 0 ? 1 : i === 2 ? 2 : i === 4 ? 3 : null;
-    return `<div class="week-day"><span>${label}</span>${day ? `<button class="day-circle work ${completed.has(day) ? 'done' : ''}" data-day="${day}" aria-label="Открыть день ${day}${completed.has(day) ? ', завершён на этой неделе' : ''}">${completed.has(day) ? '✓' : day}</button>` : '<span class="day-circle" aria-label="Восстановление">·</span>'}</div>`;
+  const completed = new Set(state.history.filter(h=>new Date(h.date).getTime()>=since).map(h=>h.day));
+  $('#week-strip').innerHTML = shorts.map((label,i)=>{
+    const slot=state.schedule.find(s=>s.weekday===i);
+    return `<div class="week-day"><span>${label}</span><button class="day-circle ${slot?'work':''} ${slot && completed.has(slot.planId)?'done':''}" data-weekday="${i}" aria-pressed="${!!slot}" aria-label="${weekdays[i]}: ${slot?'убрать тренировку':'добавить тренировку'}">${slot ? (completed.has(slot.planId)?'✓':'●') : '+'}</button></div>`;
+  }).join('');
+  $('#week-note').textContent = hasAdjacentDays(state.schedule) ? 'Есть занятия подряд. Не нагружайте одну группу мышц в соседние дни; для начала удобнее 2–3 занятия через день.' : 'Выбирайте дни нажатием. Между нагрузкой на одну группу мышц оставляйте день отдыха.';
+  $('#week-assignments').innerHTML = state.schedule.map(slot=>{
+    const plan=state.plans.find(p=>p.id===slot.planId);
+    return `<div class="week-assignment"><button data-day="${plan.id}" class="assignment-day" aria-label="Открыть комплекс: ${weekdays[slot.weekday]}">${shorts[slot.weekday]}</button><select data-template="${plan.id}" aria-label="Комплекс на ${weekdays[slot.weekday]}"><option value="current">${escape(plan.title)} · ${plan.items.length} упр.</option><optgroup label="Заменить готовым комплексом">${templates.map(t=>`<option value="${t.id}">${t.title}</option>`).join('')}</optgroup><option value="empty">Собрать с нуля</option></select></div>`;
   }).join('');
 }
 function renderTabs() {
-  $('#day-tabs').innerHTML = days.map(d => `<button id="tab-${d.id}" class="day-tab" role="tab" aria-selected="${state.day === d.id}" aria-controls="day-panel" tabindex="${state.day === d.id ? '0' : '-1'}" data-day="${d.id}"><span class="tab-number">0${d.id}</span><span class="tab-label"><small>ДЕНЬ ${d.id} · ${d.short}</small><strong>${d.title}</strong></span><span class="tab-arrow" aria-hidden="true">↗</span></button>`).join('');
+  $('#day-tabs').innerHTML = activeDays().map(d=>`<button id="tab-${d.id}" class="day-tab" role="tab" aria-selected="${state.day===d.id}" aria-controls="day-panel" tabindex="${state.day===d.id?'0':'-1'}" data-day="${d.id}"><span class="tab-number">${d.short}</span><span class="tab-label"><small>${d.weekday.toUpperCase()} · ${d.items.length} УПР.</small><strong>${escape(d.title)}</strong></span></button>`).join('');
+}
+function renderLibrary() {
+  const e=exercises[selectedExercise], plan=currentDay();
+  $('#library-selected').hidden=Boolean(librarySearch.trim());
+  const rec=recommendations(selectedExercise,plan.items);
+  const added=plan.items.includes(selectedExercise);
+  $('#library-target').textContent=activeDays().find(d=>d.id===state.day).weekday;
+  $('#library-selected').innerHTML=`<div class="library-preview"><button class="library-preview-image" data-image="${selectedExercise}" aria-label="Посмотреть технику: ${e.title}"><img src="${asset(selectedExercise)}" alt="Три фазы: ${e.title}"><span>Увеличить ↗</span></button><h3>${e.title}</h3><p>${e.cue}</p><div class="library-dose">${setCount()} × ${state.mode==='easy'?e.easy:e.reps}${e.side?' на сторону':''} · отдых ${e.rest} с</div><button class="button primary library-add" data-add="${selectedExercise}" ${added?'disabled':''}>${added?'✓ Уже в тренировке':'+ Добавить в тренировку'}</button></div><section class="recommendations" aria-label="Рекомендуемые дополнения"><h3>Хорошо дополнит</h3><p>Учитываем выбранное движение и состав тренировки. Это варианты, не обязательная нагрузка.</p>${rec.map(r=>`<div class="recommendation"><button data-select-exercise="${r.id}" class="recommendation-name">${exercises[r.id].title}<small>${r.reason}</small></button><button data-add="${r.id}" class="recommendation-add" aria-label="Добавить: ${exercises[r.id].title}">+</button></div>`).join('')}${rec.length?`<button class="text-button" id="add-recommendations">Добавить ${rec.length} дополнения ↗</button>`:'<p>Все доступные упражнения уже в комплексе. Дополнять его не требуется.</p>'}</section>`;
+  const query=librarySearch.toLocaleLowerCase('ru');
+  let found=0;
+  $('#library-groups').innerHTML=groups.map(group=>{
+    const ids=group.items.filter(id=>(exercises[id].title+' '+exercises[id].muscles+' '+exercises[id].equipment+' '+group.title).toLocaleLowerCase('ru').includes(query));
+    found+=ids.length;
+    return ids.length?`<details class="library-group" open><summary>${group.title}<span>${ids.length}</span></summary>${ids.map(id=>`<button class="library-item ${id===selectedExercise?'selected':''}" data-select-exercise="${id}" aria-pressed="${id===selectedExercise}"><img src="${asset(id)}" alt="" loading="lazy"><span><strong>${exercises[id].title}</strong><small>${exercises[id].equipment}${plan.items.includes(id)?' · ✓ В плане':''}</small></span></button>`).join('')}</details>`:'';
+  }).join('') || '<p class="library-empty">Ничего не найдено. Попробуйте «спина», «ноги» или «гантели».</p>';
+  $('#library-result-count').textContent=`${found} упражнений`;
+}
+function editPlan(items) {
+  updateItems(state,state.day,items);
+  save(); stopTimer(); render();
+}
+function addExercise(id) {
+  if(!exercises[id] || currentDay().items.includes(id)) return;
+  editPlan([...currentDay().items,id]);
+  toast(`${exercises[id].title}: добавлено. В комплексе ${currentDay().items.length} упражнений.`);
+}
+function openLibrary() {
+  const panel=$('#library');
+  if(matchMedia('(max-width: 1000px)').matches) {
+    panel.classList.add('is-open'); $('#library-backdrop').hidden=false;
+    panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
+    document.querySelectorAll('body > header, body > main, body > footer').forEach(el=>el.inert=true);
+    document.body.classList.add('library-open');
+    $('#library-close').focus();
+  } else { $('#library-search').focus(); }
+}
+function closeLibrary() {
+  $('#library').classList.remove('is-open');$('#library-backdrop').hidden=true;
+  $('#library').removeAttribute('role');$('#library').removeAttribute('aria-modal');
+  document.querySelectorAll('body > header, body > main, body > footer').forEach(el=>el.inert=false);
+  document.body.classList.remove('library-open');
+  $('#library-open').focus();
 }
 function renderCard(id, index) {
   const e = exercises[id];
   const done = session().done;
   const complete = Array.from({length:setCount()},(_,i)=>`${id}:${i}`).every(k=>done.includes(k));
   return `<article class="exercise-card ${complete ? 'is-done' : ''}" id="exercise-${id}" aria-labelledby="title-${id}">
-    <div class="card-header"><span class="exercise-index">${String(index+1).padStart(2,'0')}</span><div><h3 id="title-${id}">${e.title}</h3><p>${e.muscles}</p></div><span class="equipment">${e.equipment}</span></div>
+    <div class="card-header"><span class="exercise-index">${String(index+1).padStart(2,'0')}</span><div><h3 id="title-${id}">${e.title}</h3><p>${e.muscles}</p></div><span class="equipment">${e.equipment}</span></div><div class="exercise-edit"><button data-move="${id}" data-direction="-1" ${index===0?'disabled':''} aria-label="Выше: ${e.title}">↑</button><button data-move="${id}" data-direction="1" ${index===currentDay().items.length-1?'disabled':''} aria-label="Ниже: ${e.title}">↓</button><button data-remove="${id}" aria-label="Убрать: ${e.title}">Убрать ×</button></div>
     <button class="exercise-visual ${['bridge','heel','bird'].includes(id) ? 'ground' : ''}" data-image="${id}" aria-label="Увеличить: ${e.title}, три фазы движения"><img src="${asset(id)}" alt="${e.title}: ${e.phases.join('; ')}. Коралловым выделены: ${e.muscles.toLowerCase()}." width="1536" height="1024" loading="${index < 2 ? 'eager' : 'lazy'}"><span class="zoom-icon" aria-hidden="true">⤢</span></button>
     <div class="phase-labels">${phaseLabels(e)}</div>
     <div class="prescription"><span class="rep-value">${setCount()} × ${state.mode === 'easy' ? e.easy : e.reps}<span class="rep-unit">повторов</span></span>${e.side ? '<span class="rep-side">на каждую<br>сторону</span>' : ''}<button class="rest-button" data-rest="${e.rest}" aria-label="Запустить отдых ${e.rest} секунд">◷ ${e.rest} с отдыха</button></div>
@@ -69,21 +122,21 @@ function renderCard(id, index) {
 function renderPanel() {
   const d = currentDay();
   $('#day-panel').setAttribute('aria-labelledby', `tab-${d.id}`);
-  $('#day-panel').innerHTML = `<div class="day-panel-heading"><div><h3>${d.subtitle}</h3><p>${d.description}</p></div><button class="button primary start-button" id="start-button">${session().done.length ? 'Продолжить тренировку' : 'К упражнениям'} <span aria-hidden="true">↓</span></button></div>
+  $('#day-panel').innerHTML = `<div class="day-panel-heading"><div><label class="plan-name-label"><span class="sr-only">Название комплекса</span><input id="plan-name" value="${escape(d.title)}" maxlength="60" aria-label="Название комплекса"><span aria-hidden="true">✎</span></label><p>Соберите комплекс из библиотеки. Упражнения можно убрать или поменять местами.</p></div><button class="button primary start-button" id="start-button">${session().done.length ? 'Продолжить тренировку' : 'К упражнениям'} <span aria-hidden="true">↓</span></button></div>
     <details class="warmup"><summary><span class="warmup-icon" aria-hidden="true">☀</span><span class="warmup-title">Сначала разминка</span><span class="warmup-sub">5 минут · без гантелей</span><span class="expand-icon" aria-hidden="true">+</span></summary><ol><li><strong>2 мин.</strong> Спокойно шагайте на месте.</li><li><strong>1 мин.</strong> Мягко вращайте плечами, затем сгибайте и разгибайте локти.</li><li><strong>1 мин.</strong> Неглубокие приседания с опорой на стул, в удобном темпе.</li><li><strong>1 мин.</strong> Несколько мягких наклонов от таза и подъёмов на носки с опорой.</li></ol></details>
-    <div class="workout-meta"><span>5 упражнений · выполняйте по порядку</span><span class="muscle-key">Работающие мышцы</span></div>
-    <div class="exercise-grid">${d.items.map(renderCard).join('')}<aside class="session-card" id="session-card" aria-label="Прогресс тренировки"></aside></div>`;
+    <div class="workout-meta"><span>${d.items.length} упражнений · ${totalSets(d,state.mode)} подходов${d.items.length>6?' · для начала можно оставить 4–6 упражнений':''}</span><span class="muscle-key">Работающие мышцы</span></div>
+    <div class="exercise-grid">${d.items.length?d.items.map(renderCard).join(''):'<div class="empty-plan"><h3>Ваш комплекс начинается здесь</h3><p>Выберите упражнение в библиотеке слева. Мы предложим подходящие дополнения.</p><button class="button primary" id="empty-library">Открыть библиотеку +</button></div>'}<aside class="session-card" id="session-card" aria-label="Прогресс тренировки"></aside></div>`;
   renderProgress();
 }
 function renderProgress() {
   const s = session();
   const total = totalSets(currentDay(), state.mode);
   const done = s.done.length;
-  const all = done === total;
-  $('#session-card').innerHTML = `<span class="session-icon" aria-hidden="true">${s.finished ? '✓' : '↗'}</span><h3>${s.finished ? 'Вы сделали это.' : all ? 'Все подходы выполнены!' : 'Сегодня — чуть сильнее.'}</h3><p>${s.finished ? 'Тренировка сохранена. Отдохните хотя бы один день, затем переходите к следующему дню программы.' : all ? 'Осталось спокойно завершить занятие и сохранить результат. Выделите 2–3 минуты на восстановление дыхания.' : 'Не нужно делать идеально. Двигайтесь спокойно, следите за техникой и отмечайте каждый выполненный подход.'}</p><div class="progress-meta"><span>День ${state.day} · ваш прогресс</span><span>${done} из ${total} подходов</span></div><div class="progress-track" role="progressbar" aria-label="Выполнено подходов" aria-valuenow="${done}" aria-valuemin="0" aria-valuemax="${total}"><div class="progress-fill" style="width:${done/total*100}%"></div></div>${s.finished ? '<button class="button primary" id="new-session">Начать этот день заново ↻</button>' : `<button class="button primary" id="finish-session" ${!all ? 'disabled' : ''}>Завершить тренировку ✓</button>${done ? '<button class="text-button" id="reset-session">Сбросить отметки этого дня</button>' : ''}`}`;
+  const all = total > 0 && done === total;
+  $('#session-card').innerHTML = `<span class="session-icon" aria-hidden="true">${s.finished ? '✓' : '↗'}</span><h3>${s.finished ? 'Вы сделали это.' : all ? 'Все подходы выполнены!' : 'Сегодня — чуть сильнее.'}</h3><p>${s.finished ? 'Тренировка сохранена. Отдохните хотя бы один день, затем переходите к следующему дню программы.' : all ? 'Осталось спокойно завершить занятие и сохранить результат. Выделите 2–3 минуты на восстановление дыхания.' : 'Не нужно делать идеально. Двигайтесь спокойно, следите за техникой и отмечайте каждый выполненный подход.'}</p><div class="progress-meta"><span>День ${state.day} · ваш прогресс</span><span>${done} из ${total} подходов</span></div><div class="progress-track" role="progressbar" aria-label="Выполнено подходов" aria-valuenow="${done}" aria-valuemin="0" aria-valuemax="${total}"><div class="progress-fill" style="width:${total?done/total*100:0}%"></div></div>${s.finished ? '<button class="button primary" id="new-session">Начать этот день заново ↻</button>' : `<button class="button primary" id="finish-session" ${!all ? 'disabled' : ''}>Завершить тренировку ✓</button>${done ? '<button class="text-button" id="reset-session">Сбросить отметки этого дня</button>' : ''}`}`;
 }
 function render() {
-  renderWeek(); renderTabs(); renderPanel();
+  renderWeek(); renderTabs(); renderPanel(); renderLibrary();
   $('#mode').value = state.mode;
   $('#mode-note').textContent = state.mode === 'easy' ? 'Начните спокойно: важнее освоить движения.' : 'Переходите к двум подходам, когда хорошо восстанавливаетесь.';
 }
@@ -96,11 +149,33 @@ document.addEventListener('click', event => {
   const button = event.target.closest('button');
   if (!button) return;
   if (button.dataset.day) switchDay(Number(button.dataset.day));
+  if (button.dataset.selectExercise) { selectedExercise=button.dataset.selectExercise; librarySearch=''; $('#library-search').value=''; renderLibrary(); $('#library-selected').scrollIntoView({block:'nearest'}); }
+  if (button.dataset.add) addExercise(button.dataset.add);
+  if (button.id==='add-recommendations') {
+    const ids=recommendations(selectedExercise,currentDay().items).map(r=>r.id);
+    editPlan([...currentDay().items,...ids]);toast(`Добавлено упражнений: ${ids.length}.`);
+  }
+  if (button.dataset.remove) { editPlan(currentDay().items.filter(id=>id!==button.dataset.remove));toast('Упражнение убрано. Остальные отметки сохранены.'); }
+  if (button.dataset.move) {
+    const items=currentDay().items.slice(), index=items.indexOf(button.dataset.move), next=index+Number(button.dataset.direction);
+    if(next>=0 && next<items.length){[items[index],items[next]]=[items[next],items[index]];currentDay().items=items;save();renderPanel();$(`[data-move="${button.dataset.move}"][data-direction="${button.dataset.direction}"]`)?.focus({preventScroll:true});}
+  }
+  if (['library-open','empty-library'].includes(button.id)) openLibrary();
+  if (button.id==='library-close') closeLibrary();
+  if (button.dataset.weekday!==undefined) {
+    const weekday=Number(button.dataset.weekday), slot=state.schedule.find(s=>s.weekday===weekday);
+    if(slot && state.schedule.length===1) return toast('Оставьте хотя бы один тренировочный день.');
+    if(slot) state.schedule=state.schedule.filter(s=>s!==slot);
+    else state.schedule.push({weekday,planId:[1,2,3,4,5,6,7].find(id=>!state.schedule.some(s=>s.planId===id))});
+    state.schedule.sort((a,b)=>a.weekday-b.weekday);
+    if(!state.schedule.some(s=>s.planId===state.day))state.day=state.schedule[0].planId;
+    save();render();
+  }
   if (button.dataset.image) {
     const id = button.dataset.image, e = exercises[id];
     $('#image-title').textContent = e.title;
     $('#large-image').src = asset(id); $('#large-image').alt = `${e.title}. ${e.phases.join('. ')}. Работающие мышцы: ${e.muscles}.`;
-    $('#large-phases').innerHTML = phaseLabels(e); $('#image-cue').textContent = e.cue; openDialog('#image-dialog');
+    $('#large-phases').innerHTML = phaseLabels(e); $('#image-cue').textContent = e.cue; $('#image-technique').innerHTML=`<summary>Подробная техника</summary><ol>${e.steps.map(step=>`<li>${step}</li>`).join('')}</ol><p><strong>Легче:</strong> ${e.easier}</p>`; openDialog('#image-dialog');
     $('#image-stage').className = 'image-stage';
     $('#image-stage').dataset.ground = String(['bridge','heel','bird'].includes(id));
     $('#large-image').style.transform = '';
@@ -141,9 +216,9 @@ document.addEventListener('click', event => {
   }
   if (button.id === 'finish-session') {
     const s = session();
-    if (s.finished || s.done.length !== totalSets(currentDay(),state.mode)) return;
+    if (s.finished || !currentDay().items.length || s.done.length !== totalSets(currentDay(),state.mode)) return;
     s.finished = true;
-    state.history.push({day:state.day,mode:state.mode,date:new Date().toISOString()}); state.history = state.history.slice(-100);
+    state.history.push({day:state.day,mode:state.mode,date:new Date().toISOString(),title:currentDay().title,items:currentDay().items.slice()}); state.history = state.history.slice(-100);
     save(); stopTimer(); renderWeek(); renderPanel(); $('#new-session').focus({preventScroll:true}); toast('Тренировка сохранена. Теперь — время восстановиться.');
   }
   if (['new-session','reset-session'].includes(button.id)) {
@@ -154,9 +229,43 @@ document.addEventListener('click', event => {
 $('#day-tabs').addEventListener('keydown', event => {
   if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
   event.preventDefault();
-  const day = event.key === 'Home' ? 1 : event.key === 'End' ? 3 : ((state.day-1+(event.key === 'ArrowRight' ? 1 : 2))%3)+1;
+  const ids=activeDays().map(d=>d.id), index=ids.indexOf(state.day);
+  const day=event.key==='Home'?ids[0]:event.key==='End'?ids.at(-1):ids[(index+(event.key==='ArrowRight'?1:ids.length-1))%ids.length];
   switchDay(day,true);
 });
+document.addEventListener('change',event=>{
+  if(event.target.id!=='plan-name')return;
+  currentDay().title=event.target.value.trim() || 'Мой комплекс';
+  event.target.value=currentDay().title;save();renderTabs();renderWeek();
+});
+$('#week-count').addEventListener('change',event=>{
+  state.schedule=resizeSchedule(state.schedule,event.target.value);
+  if(!state.schedule.some(s=>s.planId===state.day))state.day=state.schedule[0].planId;
+  save();render();toast('Расписание сохранено. Настройте комплекс для каждого дня.');
+});
+$('#week-assignments').addEventListener('change',event=>{
+  const select=event.target.closest('[data-template]');if(!select || select.value==='current')return;
+  const plan=state.plans.find(p=>p.id===Number(select.dataset.template));
+  if(plan.items.length && !confirm('Заменить упражнения этого комплекса? Отметки удалённых упражнений будут сброшены, история завершённых занятий сохранится.')) {select.value='current';return;}
+  const template=templates.find(t=>t.id===Number(select.value));
+  plan.title=template?template.title:'Мой комплекс';
+  updateItems(state,plan.id,template?template.items:[]);state.day=plan.id;save();stopTimer();render();
+  if(!plan.items.length)openLibrary();
+});
+$('#library-search').addEventListener('input',event=>{librarySearch=event.target.value;renderLibrary();});
+$('#library-backdrop').addEventListener('click',closeLibrary);
+document.addEventListener('keydown',event=>{
+  if(!$('#library').classList.contains('is-open') || document.querySelector('dialog[open]'))return;
+  if(event.key==='Escape'){event.preventDefault();closeLibrary();}
+  if(event.key==='Tab'){
+    const nodes=[...$('#library').querySelectorAll('button:not(:disabled),input,summary')].filter(el=>el.getClientRects().length);
+    const first=nodes[0],last=nodes.at(-1);
+    if(!$('#library').contains(document.activeElement)){event.preventDefault();first.focus();}
+    else if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
+    else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
+  }
+});
+matchMedia('(max-width: 1000px)').addEventListener('change',()=>{if($('#library').classList.contains('is-open'))closeLibrary();});
 $('#mode').addEventListener('change', event => { state.mode = event.target.value; save(); render(); toast('Для каждого режима сохраняются отдельные отметки.'); });
 $('#guide-open').addEventListener('click',()=>openDialog('#guide-dialog'));
 $('#about-open').addEventListener('click',()=>openDialog('#about-dialog'));
@@ -191,7 +300,7 @@ $('#timer-toggle').addEventListener('click',()=>{
 document.addEventListener('visibilitychange',()=>{if(running)displayTimer();});
 
 function preparePrint() {
-  $('#print-area').innerHTML = `<h1>Моя домашняя тренировка</h1><p>3 раза в неделю, с днём отдыха между занятиями. Например: понедельник, среда, пятница. Повторяйте дни 1 → 2 → 3 каждую неделю.</p><p>Первые 2 недели — 1 подход каждого упражнения. Основной режим — 2 подхода при хорошем восстановлении. Сначала все подходы одного упражнения, затем следующее. Оставляйте запас 2–3 повтора. Выдох на усилии, возвращение плавное.</p><p>Разминка 5 минут: 2 минуты шага на месте; по минуте движений плечами и локтями, неглубоких приседаний с опорой, наклонов от таза и подъёмов на носки.</p>${days.map((d,i)=>`<section class="${i ? 'print-day' : ''}"><h2>День ${d.id}. ${d.title}</h2><p>${d.description}</p>${d.items.map((id,n)=>{const e=exercises[id];return `<article class="print-exercise"><img src="${asset(id)}" alt="${e.title}"><div><h3>${n+1}. ${e.title}</h3><p><strong>Старт: 1 × ${e.easy} · Основной: 2 × ${e.reps}${e.side?' на каждую сторону':''} · Отдых ${e.rest} с</strong></p><p>${e.muscles}.</p><p>${e.cue} ${e.steps[2]}</p><p>Легче: ${e.easier}</p></div></article>`;}).join('')}<p class="print-note">Завершение: спокойно походите 2–3 минуты. При острой боли, головокружении, боли в груди или необычной одышке остановитесь. При известных ограничениях согласуйте занятия со специалистом.</p></section>`).join('')}`;
+  $('#print-area').innerHTML = `<h1>Моя домашняя тренировка</h1><p>Ваше расписание: ${activeDays().map(d=>d.weekday).join(', ')}. Между нагрузкой на одну группу мышц оставляйте день отдыха.</p><p>Первые 2 недели — 1 подход каждого упражнения. Основной режим — 2 подхода при хорошем восстановлении. Сначала все подходы одного упражнения, затем следующее. Оставляйте запас 2–3 повтора. Выдох на усилии, возвращение плавное.</p><p>Разминка 5 минут: 2 минуты шага на месте; по минуте движений плечами и локтями, неглубоких приседаний с опорой, наклонов от таза и подъёмов на носки.</p>${activeDays().map((d,i)=>`<section class="${i ? 'print-day' : ''}"><h2>${d.weekday}. ${escape(d.title)}</h2><p>${d.items.length?'Ваш выбранный комплекс':'Комплекс пока пуст: добавьте упражнения из библиотеки.'}</p>${d.items.map((id,n)=>{const e=exercises[id];return `<article class="print-exercise"><img src="${asset(id)}" alt="${e.title}"><div><h3>${n+1}. ${e.title}</h3><p><strong>Старт: 1 × ${e.easy} · Основной: 2 × ${e.reps}${e.side?' на каждую сторону':''} · Отдых ${e.rest} с</strong></p><p>${e.muscles}.</p><p>${e.cue} ${e.steps[2]}</p><p>Легче: ${e.easier}</p></div></article>`;}).join('')}<p class="print-note">Завершение: спокойно походите 2–3 минуты. При острой боли, головокружении, боли в груди или необычной одышке остановитесь. При известных ограничениях согласуйте занятия со специалистом.</p></section>`).join('')}`;
 }
 $('#print-button').addEventListener('click',async()=>{
   preparePrint();
