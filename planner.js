@@ -1,4 +1,5 @@
 import { exercises, days as templates } from './exercises.js';
+import { stretches } from './stretches.js';
 
 export const weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
 export const shorts = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
@@ -47,7 +48,8 @@ export function initialPlanner(stored = {}) {
     const original = templates[i];
     const saved = Array.isArray(stored.plans) ? stored.plans.find(p=>p?.id===i+1) : null;
     const validItems = saved && Array.isArray(saved.items) ? [...new Set(saved.items.filter(id=>Object.hasOwn(exercises,id)))] : original?.items.slice() || [];
-    return {id:i+1, title:typeof saved?.title==='string' ? saved.title.slice(0,60) : original?.title || `Мой комплекс ${i+1}`, items:validItems};
+    const stretchItems=Array.isArray(saved?.stretches)?[...new Set(saved.stretches.filter(id=>Object.hasOwn(stretches,id)))]:[];
+    return {id:i+1, title:typeof saved?.title==='string' ? saved.title.slice(0,60) : original?.title || `Мой комплекс ${i+1}`, items:validItems, stretches:stretchItems};
   });
   const schedule = Array.isArray(stored.schedule) ? stored.schedule.filter((s,i,a)=>s && Number.isInteger(s.weekday) && s.weekday>=0 && s.weekday<7 && Number.isInteger(s.planId) && s.planId>=1 && s.planId<=7 && a.findIndex(x=>x?.weekday===s.weekday)===i && a.findIndex(x=>x?.planId===s.planId)===i).sort((a,b)=>a.weekday-b.weekday) : [{weekday:0,planId:1},{weekday:2,planId:2},{weekday:4,planId:3}];
   if (!schedule.length) schedule.push({weekday:0,planId:1});
@@ -80,6 +82,7 @@ export function updateItems(state, planId, nextItems) {
     const s = state.sessions[`${planId}:${mode}`];
     if(!s || typeof s!=='object') continue;
     s.done = s.finished ? [] : (Array.isArray(s.done) ? s.done.filter(key=>typeof key==='string' && plan.items.includes(key.split(':')[0])) : []);
+    if(s.finished) s.stretchDone = [];
     s.finished = false;
   }
 }
