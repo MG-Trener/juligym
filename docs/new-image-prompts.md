@@ -4,7 +4,7 @@
 
 ## Общий промпт
 
-Scientific educational premium fitness illustration. Landscape 1536x1024, EXACTLY THREE equal columns of full-body SAME adult woman Yulia,35,fair skin,COPPER RED hair high bun,sage-green sports top and leggings,pale sneakers. Uniform dark charcoal #111518 studio background. Realistic refined 3D instructional anatomy render, clear silhouettes. Three sequential stages left to right with identical camera/scale. ALL hands feet head and props fully inside each column. Neutral spine, controlled comfortable range, correct anatomy. Soft translucent CORAL anatomical muscle overlay on the specified working muscles. NO TEXT,numbers,labels,arrows,watermarks,extra figures. Not a website screenshot. 
+Scientific educational premium fitness illustration. Landscape 1536x1024, EXACTLY THREE equal columns of full-body SAME adult woman Yulia,35,fair skin,COPPER RED hair high bun,sage-green sports top and leggings,pale sneakers. Uniform dark charcoal #111518 studio background. Realistic refined 3D instructional anatomy render, clear silhouettes. Three sequential stages left to right with identical camera/scale. ALL hands feet head and props fully inside each column. Neutral spine, controlled comfortable range, correct anatomy. Soft translucent CORAL anatomical muscle overlay on the specified working muscles. NO TEXT,numbers,labels,arrows,watermarks,extra figures. Not a website screenshot.
 
 ## legs01 · Приседание до стула
 
@@ -478,4 +478,3 @@ Edit supplied glute bridge illustration. Preserve SAME bridge movement, number o
 ### core03
 
 Edit the supplied exercise illustration. Preserve same woman, sage sports clothing, dark charcoal background and THREE full-body poses in a single HORIZONTAL row. Correct side plank to easier KNEE SUPPORTED version in ALL three panels. Left: side lying, left forearm and left bent knee on mat, hips just resting. Middle: raise hips, left forearm and LEFT BENT KNEE stay on mat, top right leg bent resting above lower leg, torso straight shoulder to knee; NO full straight leg side plank. Right gently lower hips, knees remain bent. Coral side abdomen muscles. No text or arrows.
-
