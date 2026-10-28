@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 const root=new URL('../',import.meta.url);
-const files=['index.html','app.js','exercises.js','catalog-extra.js','planner.js','stretches.js','backup.js','offline.js','pwa.js','timer-audio.js','mobile.css','theme.js','themes.css','assets/apple-touch-icon.png','styles.css','planner.css','stretch.css','mgym.css','manifest.webmanifest','assets/favicon.svg','assets/icon-192.png','assets/icon-512.png'];
+const files=['index.html','app.js','exercises.js','catalog-extra.js','planner.js','stretches.js','backup.js','offline.js','pwa.js','timer-audio.js','mobile.css','theme.js','redesign.css','assets/apple-touch-icon.png','styles.css','planner.css','stretch.css','manifest.webmanifest','assets/favicon.svg','assets/icon-192.png','assets/icon-512.png'];
 for(const dir of ['assets/exercises','assets/fonts'])for(const name of (await fs.readdir(new URL(dir+'/',root))).sort())if(/\.(webp|woff2|ttf)$/.test(name))files.push(dir+'/'+name);
 const template=await fs.readFile(new URL('scripts/sw-template.js',root),'utf8'),hash=crypto.createHash('sha256').update(template);
 for(const file of files)hash.update(file).update(await fs.readFile(new URL(file,root)));
