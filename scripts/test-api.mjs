@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+const base=process.env.API_URL;
+if(!base || !base.includes('br-silent-lake-b99eu6ub'))throw Error('Integration writes are allowed only on the Juligym preview branch.');
+async function call(path,data,status=200){const r=await fetch(new URL(path,base),{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json','Origin':'http://127.0.0.1:4173'}:{},body:data?JSON.stringify(data):undefined});const result=await r.json();assert.equal(r.status,status,JSON.stringify(result));return result;}
+assert.equal((await call('health')).database,true);
+const {plan}=await call('plans',{title:'QA shared diary '+Date.now(),items:[{id:'legs01',sets:2},{id:'glutes01',sets:2}]},201),date='2001-02-03',core={date,planId:plan.id};
+let {session}=await call('start',core);assert.equal(session.items.length,2);
+await call('finish',core,400);
+const first={...core,exerciseId:'legs01',setIndex:0,done:true,opId:randomUUID()},second={...core,exerciseId:'glutes01',setIndex:0,done:true,opId:randomUUID()};
+await Promise.all([call('sets',first),call('sets',second)]);
+let state=await call(`state?from=${date}&to=${date}`);session=state.sessions.find(s=>s.id===session.id);assert.equal(session.marks['legs01:0'],true);assert.equal(session.marks['glutes01:0'],true);
+await call('sets',{...first,done:false,opId:randomUUID()});await call('sets',first);
+state=await call(`state?from=${date}&to=${date}`);assert.equal(state.sessions.find(s=>s.id===session.id).marks['legs01:0'],false,'replayed operation cannot resurrect an old mark');
+await call('plans',{id:plan.id,revision:plan.revision,title:'QA edited',items:[{id:'core06',sets:1}]});
+await call('plans',{id:plan.id,revision:plan.revision,title:'QA stale edit',items:[{id:'core06',sets:1}]},409);
+for(const id of ['legs01','glutes01'])for(const setIndex of [0,1])await call('sets',{...core,exerciseId:id,setIndex,done:true,opId:randomUUID()});
+const finished=(await call('finish',core)).session;assert.ok(finished.finished_at);assert.equal(finished.items[0].id,'legs01');assert.equal(finished.title,plan.title);
+assert.equal((await call('finish',core)).session.id,finished.id);
+await call('sets',{...first,opId:randomUUID()},409);
+await call('sets',{...core,date:'2099-01-01',exerciseId:'legs01',setIndex:0,done:true,opId:randomUUID()},400);
+await call('state?from=2026-01-01&to=2026-12-31',null,400);
+state=await call(`state?from=${date}&to=${date}`);assert.equal(state.history.filter(h=>h.id===finished.id).length,1);
+const forbidden=await fetch(new URL('state?from='+date+'&to='+date,base),{headers:{Origin:'https://example.org'}});assert.equal(forbidden.status,403);
+console.log('PASS: actual Neon persistence, concurrent marks, idempotency, immutable session snapshot, optimistic revision conflicts, completion/history, future-date and input validation, CORS.');

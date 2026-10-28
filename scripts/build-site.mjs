@@ -1,0 +1,13 @@
+import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
+const inputs=['index.html','config.js','manifest.webmanifest','brand.svg','app-icon-192.png','app-icon-512.png','src/app.js','src/catalog.js','src/state.js','src/api.js','src/icons.js','src/timer.js','src/pwa.js','src/styles.css','fonts/inter.woff2'];
+for(const e of JSON.parse(await fs.readFile('src/catalog.json','utf8')))inputs.push('media/'+e.id+'.webp');
+const hash=crypto.createHash('sha256');for(const file of inputs)hash.update(file).update(await fs.readFile(file));
+const version=hash.digest('hex').slice(0,16);
+const worker=`const CACHE='juligym-new-'+${JSON.stringify(version)},FILES=${JSON.stringify(inputs)};
+self.addEventListener('install',e=>e.waitUntil((async()=>{const cache=await caches.open(CACHE),q=[...FILES];const rs=await Promise.allSettled(Array.from({length:6},async()=>{while(q.length){const file=q.shift(),url=new URL(file,self.registration.scope),res=await fetch(new Request(url,{cache:'reload'}));if(!res.ok)throw Error(file);await cache.put(url,res);}}));if(rs.some(r=>r.status==='rejected')){await caches.delete(CACHE);throw Error('Incomplete cache');}})()));
+self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const key of await caches.keys())if((key.startsWith('juligym-new-')||key.startsWith('juligym:'+new URL(self.registration.scope).pathname+':'))&&key!==CACHE)await caches.delete(key);await self.clients.claim();})()));
+self.addEventListener('message',e=>{if(['UPDATE','ACTIVATE_UPDATE'].includes(e.data?.type))self.skipWaiting();});
+self.addEventListener('fetch',e=>{const scope=new URL(self.registration.scope),url=new URL(e.request.url);if(e.request.method!=='GET'||url.origin!==scope.origin||!url.pathname.startsWith(scope.pathname))return;const rel=url.pathname.slice(scope.pathname.length);if(e.request.mode!=='navigate'&&!FILES.includes(rel))return;e.respondWith((async()=>{const cache=await caches.open(CACHE),key=new URL(e.request.mode==='navigate'?'index.html':rel,scope);return await cache.match(key)||fetch(e.request);})());});
+`;
+await fs.writeFile('sw.js',worker);console.log('Site cache '+version+': '+inputs.length+' files');

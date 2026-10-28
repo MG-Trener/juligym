@@ -1,44 +1,26 @@
 {
   "id": "./",
   "name": "Моя домашняя тренировка",
-  "short_name": "Моя тренировка",
-  "description": "Домашние силовые упражнения и растяжка: ваш план работает без интернета.",
+  "short_name": "Тренировка Юли",
+  "description": "Общий дневник домашних тренировок Юли",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#faf9f5",
-  "theme_color": "#faf9f5",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
   "icons": [
     {
-      "src": "assets/icon-192.png",
+      "src": "app-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/icon-512.png",
+      "src": "app-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "categories": [
-    "health",
-    "fitness"
-  ],
-  "shortcuts": [
-    {
-      "name": "Моя тренировка",
-      "short_name": "Тренировка",
-      "url": "./#workout",
-      "icons": [
-        {
-          "src": "assets/icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
     }
   ]
 }

@@ -1,10 +1,22 @@
 {
   "name": "juligym",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/serve.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "dev": "node scripts/dev-server.mjs",
+    "build": "node scripts/build-site.mjs",
+    "build:api": "node scripts/bundle-api.mjs",
+    "test": "node --test tests/new-model.test.mjs",
+    "test:api": "node scripts/test-api.mjs",
+    "test:browser": "node scripts/check-app.cjs",
+    "test:pwa": "node scripts/check-pwa.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "pg": "^8.23.1",
+    "@neon/functions": "^0.11.0"
   }
 }
