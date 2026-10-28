@@ -1,0 +1,19 @@
+body.access-locked{overflow:hidden}
+body.access-locked>:not(#access-dialog):not(script):not(noscript){display:none!important}
+#access-dialog{width:min(430px,calc(100% - 32px));padding:30px;border:1px solid #435431;border-radius:20px;background:radial-gradient(ellipse at top left,#b8f2380c,transparent 65%),#14191c;box-shadow:0 24px 90px #0009;color:var(--ink);max-height:calc(100dvh - 32px);overflow:auto}
+#access-dialog::backdrop{background:#0d1012f5}
+#access-dialog[open]:not(:modal){position:fixed;inset:0;margin:auto;height:fit-content}
+.access-brand{display:flex;gap:12px;align-items:center;margin-bottom:26px;font-size:15px;font-weight:600;line-height:1.35}
+.access-brand img{width:44px;height:44px}
+#access-title{font-size:27px;margin-bottom:9px;letter-spacing:-.035em}
+.access-intro{color:var(--muted);font-size:14px;line-height:1.7;margin-bottom:23px}
+#access-form label{display:block;font-size:13px;margin-bottom:8px;color:#d4dec9}
+.access-input{display:flex;align-items:center;background:#0d1214;border:1px solid #465638;border-radius:11px;overflow:hidden}
+.access-input:focus-within{outline:2px solid var(--accent);outline-offset:3px}
+.access-input input{width:100%;border:0;background:none;font-size:17px;min-height:50px;outline:none;padding:12px 14px}
+.access-input input:focus-visible{outline:none}
+#access-show{padding:6px 12px;color:#c6d3ba;font-size:12px;min-height:48px}
+#access-error{color:#f0bf9e;font-size:13px;line-height:1.6;min-height:22px;margin:10px 0 14px}
+#access-form>.button{width:100%;min-height:49px;font-size:15px}
+.access-note{color:#8f9d86;font-size:12px;line-height:1.6;margin-top:18px}
+@media(max-width:370px){#access-dialog{padding:23px}#access-title{font-size:25px}}

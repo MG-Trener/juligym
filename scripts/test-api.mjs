@@ -2,8 +2,15 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 const base=process.env.API_URL;
 if(!base || !base.includes('br-silent-lake-b99eu6ub'))throw Error('Integration writes are allowed only on the Juligym preview branch.');
-async function call(path,data,status=200){const r=await fetch(new URL(path,base),{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json','Origin':'http://127.0.0.1:4173'}:{},body:data?JSON.stringify(data):undefined});const result=await r.json();assert.equal(r.status,status,JSON.stringify(result));return result;}
+let token='';
+async function call(path,data,status=200){const r=await fetch(new URL(path,base),{method:data?'POST':'GET',headers:{...(data?{'Content-Type':'application/json','Origin':'http://127.0.0.1:4173'}:{}),...(token?{Authorization:'Bearer '+token}:{})},body:data?JSON.stringify(data):undefined});const result=await r.json();assert.equal(r.status,status,JSON.stringify(result));return result;}
 assert.equal((await call('health')).database,true);
+await call('state?from=2001-02-03&to=2001-02-03',null,401);
+await call('start',{date:'2001-02-03',planId:'legs'},401);
+await call('auth',{password:'wrong'},401);
+if(!process.env.JULIGYM_PASSWORD)throw Error('Set JULIGYM_PASSWORD.');
+token=(await call('auth',{password:process.env.JULIGYM_PASSWORD})).token;
+assert.ok(token);
 const {plan}=await call('plans',{title:'QA shared diary '+Date.now(),items:[{id:'legs01',sets:2},{id:'glutes01',sets:2}]},201),date='2001-02-03',core={date,planId:plan.id};
 let {session}=await call('start',core);assert.equal(session.items.length,2);
 await call('finish',core,400);

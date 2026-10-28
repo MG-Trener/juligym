@@ -7,10 +7,11 @@
     "dev": "node scripts/dev-server.mjs",
     "build": "node scripts/build-site.mjs",
     "build:api": "node scripts/bundle-api.mjs",
-    "test": "node --test tests/new-model.test.mjs",
+    "test": "node --test tests/*.test.mjs",
     "test:api": "node scripts/test-api.mjs",
     "test:browser": "node scripts/check-app.cjs",
-    "test:pwa": "node scripts/check-pwa.cjs"
+    "test:pwa": "node scripts/check-pwa.cjs",
+    "test:access": "node scripts/check-access.cjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

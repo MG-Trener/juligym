@@ -2,10 +2,18 @@ import pg from 'pg';
 import {attachDatabasePool} from '@neon/functions';
 import {randomUUID} from 'node:crypto';
 import {InputError,dateValue,planValue,scheduleValue,defaultPlans,progress} from './model.mjs';
+import {passwordMatches,issueAccess,validAccess} from './access.mjs';
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:10000,idleTimeoutMillis:20000});
 attachDatabasePool(pool);pool.on('error',()=>console.error('Database pool error'));
 const allowed=new Set(['https://juligym.mg-trener.com','https://mg-trener.github.io','http://127.0.0.1:4173','http://localhost:4173']);
 const rates=new Map();
+let failedLogins=0,loginWindow=Date.now();
+async function readJson(request,max=24000){
+ if(Number(request.headers.get('content-length')||0)>max)throw new InputError('Запрос слишком большой.',413);
+ const reader=request.body?.getReader(),chunks=[];let size=0;
+ if(reader)try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>max){await reader.cancel();throw new InputError('Запрос слишком большой.',413);}chunks.push(value);}}finally{reader.releaseLock();}
+ try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new InputError('Некорректный JSON.');}
+}
 function serialize(row){return {...row,workout_date:typeof row.workout_date==='string'?row.workout_date:row.workout_date?.toISOString().slice(0,10)};}
 async function transaction(run){const c=await pool.connect();try{await c.query('BEGIN');const result=await run(c);await c.query('COMMIT');return result;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
 async function ensureSession(c,date,planId){
@@ -19,20 +27,27 @@ export default {async fetch(request){
  if(origin && allowed.has(origin))headers['Access-Control-Allow-Origin']=origin;
  const reply=(body,status=200)=>new Response(JSON.stringify(body),{status,headers});
  if(origin && !allowed.has(origin))return reply({error:'Источник запроса не разрешён.'},403);
- if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...headers,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Access-Control-Max-Age':'3600'}});
+ if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...headers,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'3600'}});
  try{
   const route=url.pathname.replace(/\/$/,'');
   if(route==='/health')return reply({ok:true,database:!!(await pool.query('SELECT 1 AS ok')).rows[0].ok});
+  if(route==='/auth'&&request.method==='POST'){
+   const now=Date.now();if(now-loginWindow>600000){failedLogins=0;loginWindow=now;}
+   // Per-isolate failed-attempt budget; this is not an edge or account-wide quota.
+   if(failedLogins>=60){headers['Retry-After']=String(Math.ceil((600000-(now-loginWindow))/1000));throw new InputError('Слишком много неверных попыток. Попробуйте позже.',429);}
+   const body=await readJson(request,1024);
+   if(!await passwordMatches(body?.password)){failedLogins++;throw new InputError('Неверный пароль. Попробуйте ещё раз.',401);}
+   return reply(issueAccess(process.env.DATABASE_URL));
+  }
+  if(!validAccess(request.headers.get('authorization'),process.env.DATABASE_URL))throw new InputError('Введите пароль, чтобы открыть дневник.',401);
   if(request.method==='GET' && route==='/state'){
    const from=dateValue(url.searchParams.get('from')),to=dateValue(url.searchParams.get('to'));if(Date.parse(to)-Date.parse(from)>42*86400000 || from>to)throw new InputError('Период — не более 42 дней.');
    const [plans,schedule,sessions,history]=await Promise.all([pool.query("SELECT * FROM juli_plans ORDER BY CASE id WHEN 'legs' THEN 0 WHEN 'upper' THEN 1 WHEN 'core' THEN 2 ELSE 3 END,created_at,id"),pool.query('SELECT * FROM juli_schedule WHERE id=1'),pool.query('SELECT * FROM juli_sessions WHERE workout_date BETWEEN $1 AND $2 ORDER BY workout_date',[from,to]),pool.query('SELECT id,workout_date,plan_id,title,started_at,finished_at,duration_seconds FROM juli_sessions WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 200')]);
    return reply({plans:plans.rows,schedule:schedule.rows[0],sessions:sessions.rows.map(serialize),history:history.rows.map(serialize),serverTime:new Date().toISOString()});
   }
   if(request.method!=='POST')throw new InputError('Неизвестный адрес.',404);
-  const length=Number(request.headers.get('content-length')||0);if(length>24000)throw new InputError('Запрос слишком большой.',413);
-  const bodyText=await request.text();if(Buffer.byteLength(bodyText)>24000)throw new InputError('Запрос слишком большой.',413);
-  let body;try{body=JSON.parse(bodyText);}catch{throw new InputError('Некорректный JSON.');}
-  // Lightweight per-isolate request cap; the public diary intentionally has no login.
+  const body=await readJson(request);
+  // Lightweight per-isolate mutation cap after the shared password check.
   const ip=request.headers.get('cf-connecting-ip')||request.headers.get('x-forwarded-for')?.split(',')[0]||'public',now=Date.now();let rate=rates.get(ip);if(!rate || now-rate.at>60000){rate={at:now,count:0};rates.set(ip,rate);}if(++rate.count>120)throw new InputError('Слишком много запросов. Попробуйте через минуту.',429);if(rates.size>2000)for(const [key,r] of rates)if(now-r.at>60000)rates.delete(key);
   if(route==='/plans'){
    const value=planValue(body),id=body.id || randomUUID();if(typeof id!=='string'||!/^[a-zA-Z0-9-]{1,50}$/.test(id))throw new InputError('Некорректный комплекс.');
