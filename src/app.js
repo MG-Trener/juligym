@@ -4,12 +4,15 @@ import {today,addDays,weekStart,dayIndex,summary,estimatedMinutes,formatDate,esc
 import {request} from './api.js';
 import {isUnlocked,lockAccess} from './access.js';
 import {startTimer,stopTimer,keepAwake} from './timer.js';
+import {initStretch} from './stretch.js';
+import {stretchById} from './stretch-catalog.js';
 const $=s=>document.querySelector(s),days=['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
+let openTechnique=null;
+const stretch=initStretch($('#stretch-view'),()=>openTechnique);
 let data={plans:[],schedule:{weekdays:{},revision:1},sessions:[],history:[]},selectedDate=today(),week=weekStart(today()),selectedPlan='legs',view='workout',group='all',query='',mobileSidebar=false,busy=false,online=false,editingId=null,editorItems=[],loadNumber=0;
 const plural=(n,a,b,c)=>n%100>=11&&n%100<=14?c:n%10===1?a:n%10>=2&&n%10<=4?b:c;
 const exerciseWord=n=>plural(n,'упражнение','упражнения','упражнений');
 const ui={};
-let openTechnique=null;
 try{selectedPlan=localStorage.getItem('juligym2:selected-plan')||selectedPlan;}catch{}
 const narrow=matchMedia('(max-width:1000px)');
 function closeSidebar(focus=false){mobileSidebar=false;document.body.classList.remove('sidebar-open');$('#menu-open').setAttribute('aria-expanded','false');$('.sidebar').inert=narrow.matches;$('#main').inert=false;$('.mobile-nav').inert=false;if(focus)$('#menu-open').focus();}
@@ -54,6 +57,7 @@ function renderWorkout(){
  $('#training-start').innerHTML=icon('play')+(session?.finished_at?'Посмотреть занятие':session?'Продолжить':'Начать тренировку');
  $('#training-start').disabled=busy||!online||!plan||selectedDate>today();
  $('#edit-plan').disabled=!plan;
+ $('#stretch-after').hidden=!items.length;
 }
 function renderLibrary(){
  const q=query.trim().toLocaleLowerCase('ru');const filtered=exercises.filter(e=>(group==='all'||e.group===group)&&(`${e.title} ${e.muscles} ${e.equipment}`).toLocaleLowerCase('ru').includes(q));
@@ -65,7 +69,12 @@ function renderHistory(){
  $('#history-total').textContent=data.history.length;
 }
 function render(){try{localStorage.setItem('juligym2:selected-plan',selectedPlan);}catch{}sidebar();renderWeek();renderPlans();renderWorkout();if(view==='library')renderLibrary();if(view==='history')renderHistory();document.querySelectorAll('[data-view-panel]').forEach(e=>e.hidden=e.dataset.viewPanel!==view);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-current',b.dataset.view===view?'page':'false'));renderBusy();const s=currentSession();if(s?.finished_at)document.querySelectorAll('[data-set]').forEach(b=>b.disabled=true);else{const p=summary(s||{items:currentItems(),marks:{}});if($('#finish-workout'))$('#finish-workout').disabled=busy||!online||p.done!==p.total||!p.total||selectedDate>today();}}
-function setView(next){view=next;closeSidebar();render();window.scrollTo({top:0,behavior:'instant'});}
+function setView(next){
+ if(view!==next&&(view==='stretch'||next==='stretch')){stopTimer();keepAwake(false);}
+ view=next;
+ $('.week-section').hidden=view==='stretch';
+ closeSidebar();render();window.scrollTo({top:0,behavior:'instant'});
+}
 function openEditor(id=null,addId=null){editingId=id;const plan=data.plans.find(p=>p.id===id);editorItems=(plan?.items||[]).map(i=>({...i}));if(addId)editorItems.push({id:addId,sets:2,reps:byId[addId].reps,rest:byId[addId].rest});$('#editor-title').textContent=id?'Изменить подборку':'Новая подборка';$('#plan-name').value=plan?.title||'';$('#editor-search').value='';renderEditor();$('#editor-dialog').showModal();}
 function renderEditor(){
  $('#editor-selected').innerHTML=editorItems.map((item,i)=>`<div class="editor-item"><div><strong>${byId[item.id].title}</strong><small>${byId[item.id].muscles}</small></div><label>Подходы<select data-editor-sets="${item.id}" aria-label="Подходы: ${byId[item.id].title}">${[1,2,3,4,5].map(n=>`<option ${item.sets===n?'selected':''}>${n}</option>`).join('')}</select></label><label>Повторы<input data-editor-reps="${item.id}" value="${esc(item.reps)}" maxlength="10" aria-label="Повторы: ${byId[item.id].title}"></label><label>Отдых<select data-editor-rest="${item.id}" aria-label="Отдых: ${byId[item.id].title}">${[15,30,45,60,75,90,120,180].map(n=>`<option ${item.rest===n?'selected':''} value="${n}">${n} с</option>`).join('')}</select></label><div class="editor-move"><button data-editor-up="${i}" ${i===0?'disabled':''} aria-label="Выше: ${byId[item.id].title}">↑</button><button data-editor-remove="${item.id}" aria-label="Удалить: ${byId[item.id].title}">${icon('close')}</button></div></div>`).join('')||'<p class="empty">Выберите движения ниже. До 20 упражнений в подборке.</p>';
@@ -81,6 +90,11 @@ document.addEventListener('click',async event=>{
  const b=event.target.closest('button');if(!b)return;
  if(b.dataset.group){group=b.dataset.group;setView('library');}
  if(b.dataset.view)setView(b.dataset.view);
+ if(b.id==='stretch-after'){
+  stretch.recommend(currentItems().map(item=>byId[item.id]?.group));
+  setView('stretch');
+  $('#stretch-cooldown button').focus({preventScroll:true});
+ }
  if(b.dataset.plan){selectedPlan=b.dataset.plan;stopTimer();render();$('#current-workout').scrollIntoView({behavior:'smooth',block:'start'});}
  if(b.dataset.date){selectedDate=b.dataset.date;selectedPlan=data.schedule?.weekdays?.[dayIndex(selectedDate)]||selectedPlan;stopTimer();render();}
  if(b.dataset.week){week=addDays(week,Number(b.dataset.week)*7);selectedDate=week;await load();}
@@ -97,10 +111,10 @@ document.addEventListener('click',async event=>{
   if(!currentSession()){const r=await mutate('start',{date:selectedDate,planId:selectedPlan});if(!r)return;}
   render();keepAwake(!currentSession()?.finished_at);$('#exercises').scrollIntoView({behavior:'smooth',block:'start'});
  }
- if(b.dataset.set){const [exerciseId,index]=b.dataset.set.split(':'),done=!currentSession()?.marks?.[b.dataset.set],date=selectedDate,planId=selectedPlan,rest=currentItems().find(e=>e.id===exerciseId)?.rest||60;const result=await mutate('sets',{date,planId,exerciseId,setIndex:Number(index),done,opId:crypto.randomUUID()});if(result){render();if(done&&selectedDate===date&&selectedPlan===planId&&summary(result.session).done<summary(result.session).total)startTimer(rest);}}
+ if(b.dataset.set){const [exerciseId,index]=b.dataset.set.split(':'),done=!currentSession()?.marks?.[b.dataset.set],date=selectedDate,planId=selectedPlan,rest=currentItems().find(e=>e.id===exerciseId)?.rest||60;const result=await mutate('sets',{date,planId,exerciseId,setIndex:Number(index),done,opId:crypto.randomUUID()});if(result){render();if(done&&view!=='stretch'&&selectedDate===date&&selectedPlan===planId&&summary(result.session).done<summary(result.session).total)startTimer(rest);}}
  if(b.id==='finish-workout'){const result=await mutate('finish',{date:selectedDate,planId:selectedPlan});if(result){stopTimer();keepAwake(false);notify('Тренировка Юли сохранена. День отмечен в календаре.');await load(true);}}
  if(b.dataset.rest)startTimer(Number(b.dataset.rest));
- if(b.dataset.image){const e=byId[b.dataset.image];$('#image-title').textContent=e.title;$('#image-large').src=`./media/${e.id}.webp`;$('#image-large').alt=`${e.title}: три фазы движения`;$('#image-steps').innerHTML=e.steps.map(s=>`<li>${s}</li>`).join('');$('#image-cue').textContent=e.cue;$('#image-dialog').showModal();}
+ if(b.dataset.image){const e=byId[b.dataset.image]||stretchById[b.dataset.image];$('#image-title').textContent=e.title;$('#image-large').src=`./media/${e.id}.webp`;$('#image-large').alt=`${e.title}: три фазы движения`;$('#image-steps').innerHTML=e.steps.map(s=>`<li>${s}</li>`).join('');$('#image-cue').textContent=e.cue;$('#image-dialog').showModal();}
  if(b.id==='menu-open'){mobileSidebar=!mobileSidebar;document.body.classList.toggle('sidebar-open',mobileSidebar);b.setAttribute('aria-expanded',String(mobileSidebar));$('.sidebar').inert=!mobileSidebar;$('#main').inert=mobileSidebar;$('.mobile-nav').inert=mobileSidebar;if(mobileSidebar)$('#search').focus();}
  if(b.id==='sidebar-backdrop')closeSidebar(true);
  if(b.id==='settings-open')$('#settings-dialog').showModal();
@@ -109,7 +123,10 @@ document.addEventListener('click',async event=>{
  if(b.dataset.historyDate){selectedDate=b.dataset.historyDate;week=weekStart(selectedDate);selectedPlan=b.dataset.historyPlan;await load();setView('workout');}
 });
 document.addEventListener('change',event=>{const e=event.target;if(e.dataset.editorSets)editorItems.find(i=>i.id===e.dataset.editorSets).sets=Number(e.value);if(e.dataset.editorReps)editorItems.find(i=>i.id===e.dataset.editorReps).reps=e.value;if(e.dataset.editorRest)editorItems.find(i=>i.id===e.dataset.editorRest).rest=Number(e.value);});
-$('#search').addEventListener('input',event=>{query=event.target.value;if(view!=='library'){view='library';render();}else renderLibrary();});
+$('#search').addEventListener('input',event=>{query=event.target.value;if(view!=='library'){
+ if(view==='stretch'){stopTimer();keepAwake(false);$('.week-section').hidden=false;}
+ view='library';render();
+}else renderLibrary();});
 $('#editor-search').addEventListener('input',renderEditor);
 $('#plan-form').addEventListener('submit',async event=>{event.preventDefault();const p=data.plans.find(p=>p.id===editingId),result=await mutate('plans',{id:editingId||undefined,revision:p?.revision,title:$('#plan-name').value,items:editorItems});if(result){selectedPlan=result.plan.id;await load(true);$('#editor-dialog').close();setView('workout');notify('Подборка сохранена в общем дневнике.');}});
 $('#schedule-form').addEventListener('submit',async event=>{event.preventDefault();const weekdays={};document.querySelectorAll('[data-schedule-day]').forEach(e=>{if(e.value)weekdays[e.dataset.scheduleDay]=e.value;});const result=await mutate('schedule',{weekdays,revision:data.schedule.revision});if(result){data.schedule=result.schedule;$('#schedule-dialog').close();render();notify('Расписание обновлено для всех посетителей.');}});

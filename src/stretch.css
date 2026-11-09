@@ -1,0 +1,96 @@
+.stretch-nav { width: 100%; margin: 0 0 16px; }
+.stretch-nav[aria-current="page"], .stretch-filters button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: #769434;
+  background: #b8f23816;
+}
+.stretch-heading, .stretch-cooldown, .stretch-step-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.stretch-heading { margin-bottom: 16px; }
+.stretch-heading h1 { margin: 4px 0; }
+.stretch-heading p, .stretch-cooldown p, .stretch-preset small, .stretch-selection > span, .stretch-note p, .stretch-complete p { color: var(--muted); }
+.stretch-heading > button, .stretch-cooldown > button { flex-shrink: 0; }
+.stretch-note, .stretch-cooldown, .stretch-custom, .stretch-complete {
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #14191b;
+}
+.stretch-note { border-left: 3px solid #769434; }
+.stretch-note p { margin: 4px 0 0; font-size: 13px; }
+.stretch-note a { color: var(--accent); }
+.stretch-cooldown { border-color: #52673a; }
+.stretch-cooldown p { margin-top: 4px; }
+.stretch-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; }
+.stretch-preset {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: linear-gradient(145deg, #1c2520, #14191b);
+}
+.stretch-preset:hover { border-color: #769434; }
+.stretch-preset span { flex: 1; min-width: 0; }
+.stretch-preset strong, .stretch-preset small { display: block; }
+.stretch-preset small { font-size: 12px; line-height: 1.5; }
+.stretch-preset .anatomy { width: 30px; height: 46px; flex-shrink: 0; color: var(--accent); }
+.stretch-preset > .icon { width: 18px; height: 18px; color: var(--accent); }
+.stretch-custom .section-heading { margin-top: 0; }
+.stretch-selection, .stretch-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.stretch-selection button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #1c2420;
+  text-align: left;
+}
+.stretch-selection .icon { width: 15px; height: 15px; }
+.stretch-filters { margin: 0 0 14px; }
+.stretch-filters .button { min-height: 40px; padding: 6px 11px; }
+.stretch-card .exercise-art > img { aspect-ratio: 2; }
+.stretch-card .stretch-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-block: 1px solid var(--line); padding: 10px 14px; font-size: 13px; color: #d0d8cd; }
+.stretch-meta .icon { width: 17px; height: 17px; color: var(--accent); }
+.stretch-add { margin: 2px 14px 14px; min-height: 42px; }
+.stretch-add[aria-pressed="true"] { color: var(--accent); border-color: #5b7139; }
+#stretch-guided { max-width: 750px; }
+.stretch-step-heading { justify-content: flex-start; }
+.stretch-step-heading h2 { margin: 2px 0 0; font-size: clamp(17px, 3vw, 22px); }
+.stretch-progress { width: 100%; margin: 12px 0; height: 8px; accent-color: var(--accent); }
+.stretch-step-actions, .stretch-step-secondary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.stretch-step-actions > button { flex: 1; }
+.stretch-step-secondary { margin-top: 4px; }
+.stretch-complete { display: grid; justify-items: center; gap: 10px; padding: 28px 16px; text-align: center; }
+.stretch-complete > .icon { width: 38px; height: 38px; color: var(--accent); }
+#stretch-after { margin: 2px 0 14px; }
+@media (max-width: 1000px) {
+  .mobile-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .stretch-in-session .stretch-heading { display: none; }
+  .stretch-presets { grid-template-columns: 1fr; gap: 8px; }
+  .stretch-heading, .stretch-cooldown { align-items: flex-start; }
+  .stretch-heading > button { padding: 6px 8px; font-size: 12px; }
+  .stretch-cooldown { flex-direction: column; }
+  .stretch-custom, .stretch-note, .stretch-cooldown { padding: 13px; }
+  .stretch-custom .section-heading { flex-wrap: wrap; }
+  .stretch-filters .button, .stretch-add, .stretch-selection button { min-height: 44px; }
+  .stretch-card .exercise-art > img { aspect-ratio: 1.75; }
+  .stretch-step-heading .button { padding-inline: 8px; flex-shrink: 0; }
+}
+@media (max-width: 370px) {
+  .mobile-nav { padding-inline: 3px; }
+  .mobile-nav > button > span { font-size: 10px; }
+  .stretch-step-actions > button { flex-basis: 100%; }
+}
