@@ -12,15 +12,19 @@
  <noscript>Для входа и работы дневника включите JavaScript.</noscript>
  <a class="skip-link" href="#main">К тренировке</a>
  <button id="sidebar-backdrop" class="sidebar-backdrop" aria-label="Закрыть библиотеку" tabindex="-1"></button>
- <aside class="sidebar" aria-label="Библиотека упражнений">
+ <aside class="sidebar" aria-labelledby="sidebar-caption">
   <a id="brand" class="brand" href="./" aria-label="Моя домашняя тренировка"></a>
   <nav class="workout-nav" aria-label="Силовые тренировки">
    <button class="button secondary" data-view="today">Сегодня</button>
    <button class="button secondary" data-view="workout">План недели</button>
   </nav>
   <button class="button secondary stretch-nav" data-view="stretch">↔ Растяжка</button>
-  <p class="sidebar-caption">СИЛОВАЯ БИБЛИОТЕКА</p>
-  <label class="search-box"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg><input id="search" type="search" placeholder="Поиск упражнений…" aria-label="Поиск по названию или мышцам" autocomplete="off"><kbd>⌘ K</kbd></label>
+  <p class="sidebar-caption" id="sidebar-caption">СИЛОВАЯ БИБЛИОТЕКА</p>
+  <form class="search-box" id="library-search" role="search">
+   <svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg>
+   <input id="search" type="search" placeholder="Поиск упражнений…" aria-label="Поиск по названию, мышцам или инвентарю" autocomplete="off">
+   <kbd>⌘ K</kbd><button class="search-submit" type="submit" aria-label="Показать результаты поиска" hidden>→</button>
+  </form>
   <nav id="muscle-groups" class="muscle-groups" aria-label="Группы мышц"></nav>
   <div class="sidebar-bottom"><button id="sidebar-create" class="button secondary"></button><button class="sidebar-history" data-view="history">↗ История занятий</button><div id="sidebar-foot" class="sidebar-foot"></div></div>
  </aside>
@@ -70,8 +74,8 @@
     <div class="stretch-cooldown" id="stretch-cooldown" hidden><div><h2>После тренировки</h2><p></p></div><button class="button primary" data-stretch-after-start>Начать растяжку →</button></div>
     <div class="section-heading"><h2>Готовые комплексы</h2><button class="button quiet" id="stretch-resume" data-stretch-resume hidden>Продолжить занятие →</button></div>
     <div id="stretch-presets" class="stretch-presets"></div>
-    <div class="stretch-custom"><div class="section-heading"><h2>Моя подборка</h2><button class="button primary" data-stretch-custom disabled>Начать подборку</button></div><div id="stretch-selection" class="stretch-selection" aria-live="polite"></div></div>
-    <div class="section-heading"><h2>Упражнения по группам мышц</h2><span id="stretch-count" class="count-badge" aria-live="polite"></span></div>
+    <div class="stretch-custom"><div class="section-heading"><h2 id="stretch-custom-title" tabindex="-1">Моя подборка</h2><button class="button primary" data-stretch-custom disabled>Начать подборку</button></div><div id="stretch-selection" class="stretch-selection" aria-live="polite"></div></div>
+    <div class="section-heading"><h2 id="stretch-library-title" tabindex="-1">Упражнения по группам мышц</h2><span id="stretch-count" class="count-badge" aria-live="polite"></span></div>
     <div id="stretch-groups" class="stretch-filters" role="group" aria-label="Группы мышц для растяжки"></div>
     <div id="stretch-grid" class="exercise-grid"></div>
    </div>

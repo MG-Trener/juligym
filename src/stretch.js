@@ -47,6 +47,7 @@ function exerciseCard(exercise, selected, openTechnique, side = 0) {
 
 export function initStretch(root, getOpenTechnique) {
   let group = 'all';
+  let query = '';
   let selection = [];
   let workoutCooldown = [];
   let session = null;
@@ -63,6 +64,7 @@ export function initStretch(root, getOpenTechnique) {
   const cooldown = root.querySelector('#stretch-cooldown');
   const resume = root.querySelector('#stretch-resume');
   const count = root.querySelector('#stretch-count');
+  const title = root.querySelector('#stretch-library-title');
 
   function renderSelection() {
     const start = root.querySelector('[data-stretch-custom]');
@@ -75,9 +77,14 @@ export function initStretch(root, getOpenTechnique) {
 
   function renderGroup() {
     filterBar.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.stretchGroup === group)));
-    const entries = group === 'all' ? stretches : stretches.filter(exercise => exercise.group === group);
+    const normalize = value => value.toLocaleLowerCase('ru').replaceAll('ё', 'е');
+    const term = normalize(query.trim());
+    const entries = stretches.filter(exercise => (group === 'all' || exercise.group === group) &&
+      normalize(`${exercise.title} ${exercise.muscles} ${exercise.equipment}`).includes(term));
+    title.textContent = group === 'all' ? 'Упражнения по группам мышц' : groupFilters.find(filter => filter.id === group).title;
     count.textContent = movementCount(entries.length);
-    grid.innerHTML = entries.map(exercise => exerciseCard(exercise, selection.includes(exercise.id), getOpenTechnique())).join('');
+    grid.innerHTML = entries.map(exercise => exerciseCard(exercise, selection.includes(exercise.id), getOpenTechnique())).join('') ||
+      '<p class="empty">Ничего не найдено. Измените запрос или выберите другую группу мышц.</p>';
   }
 
   function showHome() {
@@ -85,6 +92,13 @@ export function initStretch(root, getOpenTechnique) {
     home.hidden = false;
     guided.hidden = true;
     resume.hidden = !session || session.position >= session.steps.length;
+  }
+
+  function openCatalog() {
+    if (!home.hidden) return;
+    stopTimer();
+    keepAwake(false);
+    showHome();
   }
 
   function showStep() {
@@ -147,12 +161,7 @@ export function initStretch(root, getOpenTechnique) {
   root.addEventListener('click', event => {
     const button = event.target.closest('button');
     if (!button) return;
-    const {stretchGroup, stretchAdd, stretchRemove, stretchPreset} = button.dataset;
-    if (stretchGroup) {
-      group = stretchGroup;
-      renderGroup();
-      return;
-    }
+    const {stretchAdd, stretchRemove, stretchPreset} = button.dataset;
     if (stretchAdd || stretchRemove) {
       const id = stretchAdd || stretchRemove;
       const included = !selection.includes(id) && !!stretchAdd;
@@ -195,6 +204,14 @@ export function initStretch(root, getOpenTechnique) {
   });
 
   return {
+    get filters() { return {group, query}; },
+    filterCatalog({group: nextGroup = group, query: nextQuery = query}) {
+      group = nextGroup;
+      query = nextQuery;
+      openCatalog();
+      renderGroup();
+    },
+    openCatalog,
     recommend(workedGroups) {
       workoutCooldown = stretchCooldown(workedGroups);
       cooldown.hidden = !workoutCooldown.length;

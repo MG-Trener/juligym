@@ -59,6 +59,8 @@
 .stretch-selection .icon { width: 15px; height: 15px; }
 .stretch-filters { margin: 0 0 14px; }
 .stretch-filters .button { min-height: 40px; padding: 6px 11px; }
+#stretch-library-title, #stretch-custom-title { scroll-margin-top: 14px; }
+.search-box .search-submit { display: none; }
 .stretch-card .exercise-art > img { aspect-ratio: 2; }
 .stretch-card .stretch-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-block: 1px solid var(--line); padding: 10px 14px; font-size: 13px; color: #d0d8cd; }
 .stretch-meta .icon { width: 17px; height: 17px; color: var(--accent); }
@@ -76,6 +78,14 @@
 #stretch-after { margin: 2px 0 14px; }
 @media (max-width: 1000px) {
   .mobile-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .search-box .search-submit:not([hidden]) {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    min-height: 44px;
+    color: var(--accent);
+    font-size: 19px;
+  }
 }
 @media (max-width: 700px) {
   .stretch-in-session .stretch-heading { display: none; }

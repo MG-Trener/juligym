@@ -27,6 +27,10 @@ try{
  const pictures=await page.evaluate(async()=>{const {exercises}=await import('./src/catalog.js');return Promise.all(exercises.map(e=>new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(true);img.onerror=()=>resolve(false);img.src='./media/'+e.id+'.webp';})));});assert(pictures.every(Boolean));await page.screenshot({path:'artifacts/offline-mobile.png'});
  await page.locator('[data-mode=stretch]').click();
  assert.equal(await page.locator('#stretch-grid article').count(),30);
+ await page.locator('#menu-open').click();
+ await page.locator('#search').fill('сфинкс');
+ await page.locator('.search-submit').click();
+ assert.deepEqual(await page.locator('#stretch-grid h3').allTextContents(),['Низкий «Сфинкс»']);
  const stretchImages=await page.evaluate(async()=>{
   const {stretches}=await import('./src/stretch-catalog.js');
   return Promise.all(stretches.map(async exercise=>{

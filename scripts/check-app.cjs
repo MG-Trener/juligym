@@ -59,6 +59,9 @@ try{
  await q.reload();await enter(q);await q.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
  await q.locator('.mobile-nav [data-view=workout]').click();
  await q.locator('#show-all-plans').click();await q.locator(`[data-plan="${planId}"]`).click();await q.waitForSelector('.session-saved');assert.equal(await q.locator('[data-set]:enabled').count(),0);assert(await q.locator('.week-day.completed').count()>0);
+ await p.locator('[data-group=all]').click();
+ assert.equal(await p.locator('#stretch-grid article').count(),30);
+ await p.locator('[data-mode=strength]').click();
  await p.locator('[data-group=all]').click();assert.equal(await p.locator('#library-grid article').count(),87);await p.locator('#search').fill('мёртвый');assert.equal(await p.locator('#library-grid article').count(),1);await p.locator('#search').fill('');
  const decoded=await p.evaluate(async()=>{const {exercises}=await import('./src/catalog.js');return Promise.all(exercises.map(e=>new Promise(resolve=>{const i=new Image();i.onload=()=>resolve(i.naturalWidth>1000);i.onerror=()=>resolve(false);i.src='./media/'+e.id+'.webp';})));});assert.equal(decoded.filter(Boolean).length,87);
  for(const [width,height]of [[320,740],[390,844],[768,1024],[844,390],[1440,1000],[1800,1000]]){await p.setViewportSize({width,height});await p.evaluate(()=>scrollTo(0,0));assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'overflow '+width);}
