@@ -19,13 +19,21 @@
    <button class="button secondary" data-view="workout">План недели</button>
   </nav>
   <button class="button secondary stretch-nav" data-view="stretch">↔ Растяжка</button>
-  <p class="sidebar-caption">БИБЛИОТЕКА</p>
+  <p class="sidebar-caption">СИЛОВАЯ БИБЛИОТЕКА</p>
   <label class="search-box"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg><input id="search" type="search" placeholder="Поиск упражнений…" aria-label="Поиск по названию или мышцам" autocomplete="off"><kbd>⌘ K</kbd></label>
   <nav id="muscle-groups" class="muscle-groups" aria-label="Группы мышц"></nav>
   <div class="sidebar-bottom"><button id="sidebar-create" class="button secondary"></button><button class="sidebar-history" data-view="history">↗ История занятий</button><div id="sidebar-foot" class="sidebar-foot"></div></div>
  </aside>
  <main id="main" class="main">
-  <header class="app-header"><button id="menu-open" class="icon-button mobile-menu" aria-label="Открыть библиотеку" aria-expanded="false">☰</button><div><p class="greeting"><i></i> Добро пожаловать, Юля</p><p id="connection" class="connection" role="status">Подключаем общий дневник…</p></div><div class="header-actions"><span id="busy-indicator" hidden>Сохраняем…</span><button class="button quiet" data-view="history">История</button><button id="settings-open" class="profile-button" aria-label="Настройки дневника"><span class="profile-avatar">Ю</span><span><strong>Юля</strong><small>Общий дневник</small></span><b>⌄</b></button></div></header>
+  <header class="app-header">
+   <button id="menu-open" class="icon-button mobile-menu" aria-label="Открыть библиотеку" aria-expanded="false">☰</button>
+   <div><p class="greeting"><i></i> Добро пожаловать, Юля</p><p id="connection" class="connection" role="status">Подключаем общий дневник…</p></div>
+   <div class="mode-switch" role="group" aria-label="Режим занятий">
+    <button type="button" data-mode="strength" aria-pressed="true">Силовые</button>
+    <button type="button" data-mode="stretch" aria-pressed="false">Растяжка</button>
+   </div>
+   <div class="header-actions"><span id="busy-indicator" hidden>Сохраняем…</span><button class="button quiet" data-view="history">История</button><button id="settings-open" class="profile-button" aria-label="Настройки дневника"><span class="profile-avatar">Ю</span><span><strong>Юля</strong><small>Общий дневник</small></span><b>⌄</b></button></div>
+  </header>
   <section class="week-section" aria-labelledby="week-title"><div class="heading-row"><div><h1 id="week-title">Ваш ритм недели</h1><p id="week-stat" class="muted">7 дней · ваш темп</p></div><button id="schedule-open" class="button quiet">Настроить дни ↗</button></div><div class="week-toolbar"><button class="icon-button" data-week="-1" aria-label="Предыдущая неделя">‹</button><span id="week-range"></span><button class="icon-button" data-week="1" aria-label="Следующая неделя">›</button><button id="current-week" class="text-button">Текущая неделя</button></div><div id="week-days" class="week-days"></div></section>
   <section data-view-panel="today" id="today-view" aria-labelledby="today-title">
    <div class="today-heading">
@@ -63,7 +71,7 @@
     <div class="section-heading"><h2>Готовые комплексы</h2><button class="button quiet" id="stretch-resume" data-stretch-resume hidden>Продолжить занятие →</button></div>
     <div id="stretch-presets" class="stretch-presets"></div>
     <div class="stretch-custom"><div class="section-heading"><h2>Моя подборка</h2><button class="button primary" data-stretch-custom disabled>Начать подборку</button></div><div id="stretch-selection" class="stretch-selection" aria-live="polite"></div></div>
-    <div class="section-heading"><h2>Упражнения по группам мышц</h2></div>
+    <div class="section-heading"><h2>Упражнения по группам мышц</h2><span id="stretch-count" class="count-badge" aria-live="polite"></span></div>
     <div id="stretch-groups" class="stretch-filters" role="group" aria-label="Группы мышц для растяжки"></div>
     <div id="stretch-grid" class="exercise-grid"></div>
    </div>

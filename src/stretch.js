@@ -8,8 +8,10 @@ const groupFilters = [{id: 'all', title: 'Все группы'}, ...groups];
 const holdMessage = 'Удержание завершено. Плавно выйдите из положения.';
 
 function movementCount(count) {
-  if (count === 1) return '1 движение';
-  return `${count} ${count <= 4 ? 'движения' : 'движений'}`;
+  const ones = count % 10;
+  const word = count % 100 >= 11 && count % 100 <= 14 ? 'движений' :
+    ones === 1 ? 'движение' : ones >= 2 && ones <= 4 ? 'движения' : 'движений';
+  return `${count} ${word}`;
 }
 
 function duration(exercise) {
@@ -28,7 +30,8 @@ function exerciseCard(exercise, selected, openTechnique, side = 0) {
   const guided = side !== 0;
   const hintId = guided ? `guided-${exercise.id}` : exercise.id;
   const category = exercise.seconds ? 'Растяжка' : 'Подвижность';
-  const dose = exercise.seconds ? `${exercise.seconds} с${exercise.unilateral ? ' на сторону' : ''}` : `${exercise.repetitions} плавных повторов`;
+  const quantity = exercise.seconds ? `${exercise.seconds} с` : `${exercise.repetitions} плавных повторов`;
+  const dose = `${quantity}${exercise.unilateral ? ' на сторону' : ''}`;
   const technique = `<ol>${exercise.steps.map(step => `<li>${step}</li>`).join('')}</ol><p>${exercise.cue}</p>`;
   return `<article class="exercise-card stretch-card">
     <header><div><h3>${exercise.title}</h3><p>${exercise.muscles}</p></div><span class="difficulty">${category}</span></header>
@@ -59,6 +62,7 @@ export function initStretch(root, getOpenTechnique) {
   const selectedList = root.querySelector('#stretch-selection');
   const cooldown = root.querySelector('#stretch-cooldown');
   const resume = root.querySelector('#stretch-resume');
+  const count = root.querySelector('#stretch-count');
 
   function renderSelection() {
     const start = root.querySelector('[data-stretch-custom]');
@@ -72,6 +76,7 @@ export function initStretch(root, getOpenTechnique) {
   function renderGroup() {
     filterBar.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.stretchGroup === group)));
     const entries = group === 'all' ? stretches : stretches.filter(exercise => exercise.group === group);
+    count.textContent = movementCount(entries.length);
     grid.innerHTML = entries.map(exercise => exerciseCard(exercise, selection.includes(exercise.id), getOpenTechnique())).join('');
   }
 

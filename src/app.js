@@ -11,7 +11,7 @@ const $=s=>document.querySelector(s),days=['ПН','ВТ','СР','ЧТ','ПТ','�
 let openTechnique=null;
 const stretch=initStretch($('#stretch-view'),()=>openTechnique);
 let data={plans:[],schedule:{weekdays:{},revision:1},sessions:[],history:[]},selectedDate=today(),week=weekStart(today()),selectedPlan='legs',view='today',group='all',query='',mobileSidebar=false,busy=false,online=false,editingId=null,editorItems=[],loadNumber=0;
-let loadedWeek=null, guidedKey=null, todayHtml=null;
+let loadedWeek=null, guidedKey=null, todayHtml=null, strengthView='today';
 const plural=(n,a,b,c)=>n%100>=11&&n%100<=14?c:n%10===1?a:n%10>=2&&n%10<=4?b:c;
 const exerciseWord=n=>plural(n,'упражнение','упражнения','упражнений');
 const ui={};
@@ -187,6 +187,7 @@ function render(){
  $('.week-section').hidden=['today','stretch','guided'].includes(view);
  document.querySelectorAll('[data-view-panel]').forEach(panel=>panel.hidden=panel.dataset.viewPanel!==view);
  document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-current',button.dataset.view===(view==='guided'?'workout':view)?'page':'false'));
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===(view==='stretch'?'stretch':'strength'))));
  renderBusy();
 }
 
@@ -200,6 +201,7 @@ function setView(next,closeMenu=true){
  if(view==='guided'&&next!=='guided')document.body.insertBefore($('#timer'),$('#toast'));
  if(view!=='guided'&&next==='guided')$('#guided-timer-slot').append($('#timer'));
  view=next;
+ if(['today','workout','guided','library'].includes(view))strengthView=view;
  if(view==='today'){
   week=weekStart(today());
   if(weekStart(selectedDate)!==week)selectedDate=today();
@@ -269,6 +271,11 @@ document.addEventListener('click',async event=>{
  const hint=event.target.closest('.technique>summary');if(hint){event.preventDefault();const panel=hint.parentElement;openTechnique=panel.open?null:panel.dataset.technique;document.querySelectorAll('.technique').forEach(d=>d.open=d.dataset.technique===openTechnique);return;}
  if(event.target.closest('#lock-access')){stopTimer();keepAwake(false);lockAccess();return;}
  const b=event.target.closest('button');if(!b)return;
+ if(b.dataset.mode){
+  const next=b.dataset.mode==='stretch'?'stretch':strengthView;
+  if(next!==view)setView(next);
+  return;
+ }
  if(b.dataset.group){group=b.dataset.group;setView('library');}
  if(b.dataset.view)setView(b.dataset.view);
  if(b.id==='stretch-after'||b.hasAttribute('data-workout-stretch')){

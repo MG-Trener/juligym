@@ -9,7 +9,7 @@ try{
  let page=await context.newPage();await page.goto(base);await enter(page);await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
  await page.evaluate(()=>navigator.serviceWorker.ready);
  const cache=await page.evaluate(async()=>{const names=(await caches.keys()).filter(n=>n.startsWith('juligym-access-'));return (await(await caches.open(names[0])).keys()).length;});
- assert.equal(cache,125);
+ assert.equal(cache,140);
  const cdp=await context.newCDPSession(page);await cdp.send('Page.enable');const install=await cdp.send('Page.getInstallabilityErrors');assert.deepEqual(install.installabilityErrors,[]);
  assert.equal(await page.locator('#today-view').isVisible(),true);
  await page.locator('.mobile-nav [data-view=workout]').click();
@@ -25,8 +25,8 @@ try{
  await page.waitForSelector('[data-set]');assert.equal(await page.locator('[data-set]:enabled').count(),0);assert.equal(await page.locator('#training-start').isDisabled(),true);
  await page.locator('[data-view=library]').last().click();assert.equal(await page.locator('#library-grid article').count(),87);
  const pictures=await page.evaluate(async()=>{const {exercises}=await import('./src/catalog.js');return Promise.all(exercises.map(e=>new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(true);img.onerror=()=>resolve(false);img.src='./media/'+e.id+'.webp';})));});assert(pictures.every(Boolean));await page.screenshot({path:'artifacts/offline-mobile.png'});
- await page.locator('.mobile-nav [data-view=stretch]').click();
- assert.equal(await page.locator('#stretch-grid article').count(),15);
+ await page.locator('[data-mode=stretch]').click();
+ assert.equal(await page.locator('#stretch-grid article').count(),30);
  const stretchImages=await page.evaluate(async()=>{
   const {stretches}=await import('./src/stretch-catalog.js');
   return Promise.all(stretches.map(async exercise=>{
@@ -39,5 +39,5 @@ try{
  assert.equal(await page.locator('#timer').isVisible(),true);
  await page.locator('[data-stretch-next]').click();
  assert.match(await page.locator('#stretch-guided h2').innerText(),/сторона 2 из 2/);
- console.log('PASS: installable PWA, complete cache, 102 offline illustrations, read-only diary and stretching exercises with timer offline, WebAudio controls.');
+ console.log('PASS: installable PWA, complete cache, 117 offline illustrations, read-only diary and stretching exercises with timer offline, WebAudio controls.');
 }finally{await context.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

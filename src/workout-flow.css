@@ -1,6 +1,26 @@
 .workout-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 8px; }
 .workout-nav .button { padding-inline: 6px; }
 .workout-nav [aria-current="page"] { color: var(--accent); border-color: #769434; background: #b8f23816; }
+.mode-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 3px;
+  margin-inline-start: auto;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #111619;
+}
+.mode-switch button {
+  min-height: 44px;
+  padding-inline: 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mode-switch button:hover { color: var(--ink); background: #ffffff0a; }
+.mode-switch button[aria-pressed="true"] { color: #172706; background: var(--accent); }
 #today-view, #guided-view { max-width: 790px; }
 .today-heading, .guided-heading, .guided-position {
   display: flex;
@@ -52,6 +72,8 @@
   .mobile-nav > button { padding-inline: 0; }
 }
 @media (max-width: 700px) {
+  .app-header { flex-wrap: wrap; }
+  .app-header > .mode-switch { order: 1; }
   .today-card { padding: 16px; }
   .today-heading > .button, .guided-heading > .button { padding-inline: 8px; font-size: 12px; }
   .today-previous { align-items: stretch; flex-direction: column; gap: 10px; }

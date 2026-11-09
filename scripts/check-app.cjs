@@ -26,6 +26,11 @@ try{
  await p.locator('#guided-mark').click();
  await p.waitForSelector('#guided-mark[data-guided-set="legs01:1"]');
  assert.equal(await p.locator('#guided-timer-slot .timer').isVisible(),true);
+ await p.locator('[data-mode=stretch]').click();
+ assert.equal(await p.locator('#stretch-view').isVisible(),true);
+ assert.equal(await p.locator('#timer').isVisible(),false);
+ await p.locator('[data-mode=strength]').click();
+ await p.waitForSelector('#guided-mark[data-guided-set="legs01:1"]');
  await q.goto(base);await enter(q);await q.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
  assert.equal(await q.locator('#today-view').isVisible(),true);
  await q.screenshot({path:'artifacts/today-mobile.png'});

@@ -69,3 +69,71 @@ Gentle standing side stretch in frontal view. Left: stand feet hip width, arms a
 ## `stretch-cat-cow.webp`
 
 Cat-cow spinal mobility, true side profile all three frames, on exercise mat, four-point kneeling. First frame: back neutral, both palms under shoulders, both knees under hips, look down. Middle: gently round upper and lower back upward in CAT position, tuck pelvis, gaze down toward knees, elbows remain straight but not locked. Last: gently tilt pelvis and let sternum move forward in a SMALL COW arch with neck nearly neutral, same hands and knees locations. Hands, knees and shins stay grounded throughout, no extreme back arch. Coral subtly highlights trunk alongside spine in the middle panel.
+
+## Дополнение библиотеки · 15 движений
+
+Встроенный ImageGen. Референс для новых иллюстраций — `media/stretch-calves.webp`.
+
+> Scientific educational exercise illustration for Juligym. Image 1 is a reference only for subject, photographic realism, muted colors and anatomy overlay, not poses. Make a NEW stretch triptych. Same adult auburn-haired woman with bun, sage-green opaque athletic wear and white sneakers. Dark charcoal seamless fitness studio, subtle floor, soft illumination. Landscape 1536x1024, exactly three equal-width columns in one horizontal row, center each separate pose inside its own third with air at both side boundaries, same fixed camera and scale, no cropped head, hands or feet (except intentionally medium wrist study). Show the same woman once in each panel. Human anatomy and props must be accurate, calm and beginner-friendly. Subtle coral translucent anatomical overlay over the specified area. No text, numbers, arrows, captions, borders or watermarks.
+
+### `stretch-hip-flexor.webp`
+
+profile view facing right. On a thin mat, left knee directly beneath hip on floor, right foot flat ahead, right knee about 90 degrees, both hands on right thigh. Frame 1 tall torso with neutral pelvis. Frame 2 gently tuck the pelvis and shift hips slightly forward, torso upright. Frame 3 release back to neutral. Highlight only the front of the left hip above the kneeling thigh.
+
+### `stretch-butterfly.webp`
+
+front view at knee height. Sit tall on a thin mat, soles of both shoes touch, knees open out to the sides and angled upwards comfortably, lightly hold ankles. Frame 1 upright. Frame 2 slight forward hinge from hips with neutral back, knees stay in place. Frame 3 upright again. Highlight inner thighs on both legs. Never press knees with arms.
+
+### `stretch-ankle-circles.webp`
+
+front three-quarter view, seated upright on a stable black chair, both knees bent, left sneaker firmly on floor, right sneaker lifted just a few centimeters, right thigh supported on seat and knee almost stationary. Frame 1 foot neutral; frame 2 pivot only the raised right foot slightly inward at ankle; frame 3 pivot the same foot slightly outward during a controlled small circle. Show both shoes and their contrasting ground contact. Coral only around moving ankle and lower calf.
+
+### `stretch-hip-fallout.webp`
+
+Camera is straight overhead pointing vertically down. In each panel, the crown of her head points toward top edge and shoes toward bottom edge, whole body fits. Woman lies completely FLAT on back, face points directly up at camera, shoulders and head planted on floor, arms beside torso, feet spaced a little apart, knees bent and pointing to camera. In middle panel only, open knee at viewer's LEFT toward left edge by about 35 degrees. The other knee remains pointing straight up toward camera; both shoes stay at original same fixed points on mat. The lifted knee does not touch floor, pelvis remains symmetrical. First and third panels show both knees facing straight up. Coral highlight at outer hip on same leg as outward knee (viewer-left). This is a bent knee fall-out, one knee only.
+
+### `stretch-glute-cross.webp`
+
+Camera is directly overhead pointing vertically down to the flat mat. Whole body lengthwise within each narrow panel. Lying completely flat on her back, face points directly up at camera, head and shoulders at rest on the mat, not a crunch. Viewer-right leg stays entirely extended on mat, shoe aligned with same hip. Viewer-left thigh is gently held with two hands wrapping behind thigh, knee bent and its shoe lifted. Start bent knee points toward upper left of the panel, over its own left hip. Middle phase gently moves that same bent knee inward across the body midline to point toward her opposite shoulder, visible diagonal; the hips stay flat and free leg stays extended. Final panel returns bent knee over its own hip. Coral on outer hip of bent leg.
+
+### `stretch-child-pose.webp`
+
+profile, mat, face to right. Frame 1 on all fours hands below shoulders, knees below hips, shins down. Frame 2 gently send hips back towards heels, hands still planted forward, arms stretched forward with a soft elbow, torso inclined, head follows spine. Frame 3 return to same all fours. Both shins remain on mat, no hip above head. Highlight along both sides of mid to lower back.
+
+### `stretch-seated-rotation.webp`
+
+front three-quarter view. Seated upright on stable dark chair, feet flat, knees straight ahead, forearms lightly crossed over chest. Frame 1 facing front; frame 2 modest chest and shoulder turn to her left, hips and knees exactly unchanged; frame 3 torso front again. No head overrotation. Highlight thoracic area along sides of upper back and ribs.
+
+### `stretch-standing-chest.webp`
+
+front three-quarter profile where clasped hands and chest are visible. Standing with softly bent knees, no prop, hands loosely clasped behind pelvis in all frames. Frame 1 neutral shoulders, hands close to hips. Frame 2 gently roll shoulders back and move joined hands slightly away from hips, elbows soft and arms angle down, no back arch. Frame 3 back to neutral. Coral overlay on upper pectorals only.
+
+### `stretch-open-book.webp`
+
+A high camera looking nearly vertically down, mat runs diagonally inside each equal panel, head and both feet visible. She lies on her left side with left side of her head resting on a small folded dark towel, knees bent and touching each other, top knee stays stacked above bottom knee, feet together in all 3 poses. In all three poses lower left arm is straight on the mat and extends out forward at a 90 degree angle from her torso, and it stays fixed in that same exact position for all three images. In first and last phases upper right arm rests along lower arm, palms together. In middle phase only, upper right arm lifts away from the lower arm and swings open toward ceiling and slightly behind shoulder, chest rotates slightly, with a clear V between arms when viewed diagonally. The lower straight arm stays visibly extended forward in same fixed position. Coral on upper right pectoral only.
+
+### `stretch-upper-trap.webp`
+
+front view seated on sturdy black chair, feet flat. Right hand lightly holds chair seat near right hip, left hand rests on thigh. Frame 1 head neutral; frame 2 head tilts gently left, face still forward, shoulders level, neither hand touches head; frame 3 neutral. Coral narrow highlight on side of neck and top of right shoulder only.
+
+### `stretch-shoulder-rotation.webp`
+
+front view, standing tall, elbows bent 90 degrees and held next to waist throughout, palms face upwards. Frame 1 forearms parallel, fingertips point directly forward. Frame 2 forearms rotate out to form a gentle V as elbows remain against body. Frame 3 forearms parallel and forward again. No weights, no arms raised. Coral highlight over outer rear shoulder area only.
+
+### `stretch-biceps-wall.webp`
+
+Adult woman in a staggered upright stance next to a single wall on viewer-left. Viewer-left arm is the working arm, viewer-left hand touching the wall in every frame, position unchanged. The wall-side arm extends back and out a little, wall-side palm flat with fingers up just below shoulder height, elbow slightly bent. The free right arm nearest viewer-right simply hangs by her right thigh without contact and has NO highlight. Pose 1 chest slightly toward wall, pose 2 chest rotated about 20 degrees away from wall while pelvis and feet remain steady and palm remains planted, pose 3 same as pose 1. Use three-quarter front view showing both arms and the single wall. Overlay subtle coral muscle highlight ONLY on the upper arm that is actively touching the wall, the anatomically anterior biceps between shoulder and elbow. It is essential that NO coral appears on the freely hanging arm or either shoulder.
+
+### `stretch-wrist-flexors.webp`
+
+medium waist-up three-quarter view so finger and wrist position readable. Standing, right arm forward slightly below shoulder with elbow soft, forearm fully supinated and palm facing upward. Frame 1 wrist neutral, left hand near right fingers. Frame 2 left hand gently guides the fingers of right hand toward the floor so right wrist extends, keep right palm up and front of forearm facing up. Frame 3 left hand releases and right wrist returns to neutral. Highlight right inner forearm. Anatomically accurate fingers.
+
+### `stretch-sphinx.webp`
+
+true side profile, full body, on a charcoal mat, lying prone with legs straight, tops of sneakers and hips supported. Frame 1 chest low and elbows slightly ahead of shoulders, forearms on mat, face forward-down. Frame 2 small lift of breastbone with both forearms pressing on mat, pelvis and legs remain on floor, neck long and gaze slightly down, gentle shallow backbend. Frame 3 lower chest and relax. Highlight front abdominal wall only, visible edge from side.
+
+### `stretch-knee-roll.webp`
+
+slightly elevated diagonal view from foot end to show both knees and shoulders, full body supine on dark mat. Head rests on floor and arms out diagonally, palms up. Frame 1 knees bent pointing at ceiling, shoes flat, knees and feet together. Frame 2 both knees tip together just 25 degrees to right, feet pivot while head and both shoulders stay on floor, no leg crosses another. Frame 3 knees centered and both shoes flat. Coral along side of waist opposite the tilt.
+
+Для описаний исходного положения и комфортной амплитуды использованы материалы [Mayo Clinic](https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/stretching/art-20546848), [NHS о движениях сидя](https://www.nhs.uk/live-well/exercise/sitting-exercises/) и [Kingston and Richmond NHS о подвижности голеностопа](https://www.kingstonandrichmond.nhs.uk/patients-and-families/patient-leaflets/home-exercise-programme-falls-prevention).
