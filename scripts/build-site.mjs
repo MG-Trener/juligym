@@ -4,6 +4,7 @@ import {stretches} from '../src/stretch-catalog.js';
 const inputs=['index.html','config.js','manifest.webmanifest','brand.svg','app-icon-192.png','app-icon-512.png','src/app.js','src/entry.js','src/access.js','src/access.css','src/catalog.js','src/state.js','src/api.js','src/icons.js','src/timer.js','src/pwa.js','src/styles.css','fonts/inter.woff2'];
 for(const e of JSON.parse(await fs.readFile('src/catalog.json','utf8')))inputs.push('media/'+e.id+'.webp');
 inputs.push('src/stretch.js','src/stretch-catalog.js','src/stretch.css',...stretches.map(exercise=>'media/'+exercise.id+'.webp'));
+inputs.push('src/workout-flow.js','src/workout-flow.css');
 const hash=crypto.createHash('sha256');for(const file of inputs)hash.update(file).update(await fs.readFile(file));
 const version=hash.digest('hex').slice(0,16);
 const worker=`const CACHE='juligym-access-'+${JSON.stringify(version)},FILES=${JSON.stringify(inputs)};

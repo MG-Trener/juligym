@@ -5,7 +5,7 @@
  <meta name="theme-color" content="#0f1115"><meta name="description" content="Общий дневник домашних тренировок Юли. 87 упражнений с наглядной техникой, подборки, календарь и сохранение выполненных занятий.">
  <title>Моя домашняя тренировка · Дневник Юли</title>
  <link rel="icon" type="image/svg+xml" href="./brand.svg"><link rel="apple-touch-icon" href="./app-icon-192.png"><link rel="manifest" href="./manifest.webmanifest">
- <link rel="stylesheet" href="./src/styles.css"><link rel="stylesheet" href="./src/stretch.css"><link rel="stylesheet" href="./src/access.css"><script src="./config.js"></script><script type="module" src="./src/entry.js"></script><script type="module" src="./src/pwa.js"></script>
+ <link rel="stylesheet" href="./src/styles.css"><link rel="stylesheet" href="./src/stretch.css"><link rel="stylesheet" href="./src/workout-flow.css"><link rel="stylesheet" href="./src/access.css"><script src="./config.js"></script><script type="module" src="./src/entry.js"></script><script type="module" src="./src/pwa.js"></script>
 </head>
 <body class="access-locked">
  <dialog id="access-dialog" open aria-labelledby="access-title" aria-describedby="access-intro"><div class="access-brand"><img src="./brand.svg" alt=""><span>Моя домашняя<br>тренировка</span></div><h1 id="access-title">Время для себя</h1><p id="access-intro" class="access-intro">Введите пароль, чтобы открыть тренировки и общий дневник Юли.</p><form id="access-form"><label for="access-password">Пароль</label><div class="access-input"><input id="access-password" type="password" autocomplete="current-password" required maxlength="128" aria-describedby="access-error" autofocus><button type="button" id="access-show" aria-pressed="false" aria-label="Показать или скрыть пароль">Показать</button></div><p id="access-error" role="alert"></p><button class="button primary" type="submit">Открыть тренировку</button></form><p class="access-note">Пароль запрашивается при каждом открытии страницы. Дневник остаётся общим для всех, кто знает пароль.</p></dialog>
@@ -14,6 +14,10 @@
  <button id="sidebar-backdrop" class="sidebar-backdrop" aria-label="Закрыть библиотеку" tabindex="-1"></button>
  <aside class="sidebar" aria-label="Библиотека упражнений">
   <a id="brand" class="brand" href="./" aria-label="Моя домашняя тренировка"></a>
+  <nav class="workout-nav" aria-label="Силовые тренировки">
+   <button class="button secondary" data-view="today">Сегодня</button>
+   <button class="button secondary" data-view="workout">План недели</button>
+  </nav>
   <button class="button secondary stretch-nav" data-view="stretch">↔ Растяжка</button>
   <p class="sidebar-caption">БИБЛИОТЕКА</p>
   <label class="search-box"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg><input id="search" type="search" placeholder="Поиск упражнений…" aria-label="Поиск по названию или мышцам" autocomplete="off"><kbd>⌘ K</kbd></label>
@@ -23,7 +27,24 @@
  <main id="main" class="main">
   <header class="app-header"><button id="menu-open" class="icon-button mobile-menu" aria-label="Открыть библиотеку" aria-expanded="false">☰</button><div><p class="greeting"><i></i> Добро пожаловать, Юля</p><p id="connection" class="connection" role="status">Подключаем общий дневник…</p></div><div class="header-actions"><span id="busy-indicator" hidden>Сохраняем…</span><button class="button quiet" data-view="history">История</button><button id="settings-open" class="profile-button" aria-label="Настройки дневника"><span class="profile-avatar">Ю</span><span><strong>Юля</strong><small>Общий дневник</small></span><b>⌄</b></button></div></header>
   <section class="week-section" aria-labelledby="week-title"><div class="heading-row"><div><h1 id="week-title">Ваш ритм недели</h1><p id="week-stat" class="muted">7 дней · ваш темп</p></div><button id="schedule-open" class="button quiet">Настроить дни ↗</button></div><div class="week-toolbar"><button class="icon-button" data-week="-1" aria-label="Предыдущая неделя">‹</button><span id="week-range"></span><button class="icon-button" data-week="1" aria-label="Следующая неделя">›</button><button id="current-week" class="text-button">Текущая неделя</button></div><div id="week-days" class="week-days"></div></section>
-  <section data-view-panel="workout" id="workout-view">
+  <section data-view-panel="today" id="today-view" aria-labelledby="today-title">
+   <div class="today-heading">
+    <div><span class="eyebrow" id="today-date"></span><h1 id="today-title">Сегодня</h1></div>
+    <button class="button quiet" data-view="workout">План недели ↗</button>
+   </div>
+   <p id="today-offline" class="flow-offline" hidden>Для начала занятия и записи подходов нужен интернет.</p>
+   <div id="today-content"></div>
+  </section>
+  <section data-view-panel="guided" id="guided-view" aria-labelledby="guided-title" hidden>
+   <div class="guided-heading">
+    <div><span class="eyebrow">СИЛОВАЯ ТРЕНИРОВКА</span><h1 id="guided-title"></h1></div>
+    <button class="button quiet" data-view="workout">Весь комплекс</button>
+   </div>
+   <p id="guided-offline" class="flow-offline" hidden>Отметка подходов доступна с интернетом.</p>
+   <div id="guided-timer-slot"></div>
+   <div id="guided-content"></div>
+  </section>
+  <section data-view-panel="workout" id="workout-view" hidden>
    <section aria-labelledby="plans-heading"><div class="section-heading"><h2 id="plans-heading">Мои тренировки</h2><button id="show-all-plans" class="text-button" aria-expanded="false">Все ↗</button></div><div id="plans" class="plans"></div><div class="new-plan-row"><button id="create-plan" class="text-button">+ Создать свою подборку</button></div></section>
    <section id="current-workout" class="current-workout" aria-labelledby="workout-title"><div class="section-heading"><h2>Текущая тренировка</h2><button id="edit-plan" class="button quiet">Детали тренировки ›</button></div><div class="current-summary"><div><h2 id="workout-title"></h2><span id="date-badge" class="date-badge"></span></div><div id="workout-progress" class="workout-progress"></div><button class="button primary start-training" id="training-start"></button></div></section>
    <section aria-labelledby="exercise-heading"><div class="section-heading"><h2 id="exercise-heading">Упражнения</h2><details class="warmup"><summary>☀ Разминка · 5 мин</summary><p>2 минуты спокойного шага. Затем по минуте: движения плечами и локтями, неглубокие приседания с опорой, наклоны от таза и подъёмы на носки. Начинайте без гантелей.</p></details></div><div id="exercises" class="exercise-grid"></div><div id="session-actions" class="session-actions"></div></section>
@@ -50,7 +71,7 @@
   </section>
   <footer class="footer"><span>Моя домашняя тренировка © <span id="year"></span></span><span>В своём темпе. Шаг за шагом.</span><button class="text-button" onclick="document.querySelector('#about-dialog').showModal()">О программе</button></footer>
  </main>
- <nav class="mobile-nav" aria-label="Основная навигация"><button data-view="workout">◉<span>Тренировка</span></button><button data-view="stretch">↔<span>Растяжка</span></button><button data-view="library">☷<span>Библиотека</span></button><button data-view="history">↗<span>История</span></button></nav>
+ <nav class="mobile-nav" aria-label="Основная навигация"><button data-view="today">◉<span>Сегодня</span></button><button data-view="workout">▦<span>План</span></button><button data-view="stretch">↔<span>Растяжка</span></button><button data-view="library">☷<span>Библиотека</span></button><button data-view="history">↗<span>История</span></button></nav>
  <aside id="timer" class="timer" aria-label="Таймер отдыха" hidden></aside><div id="toast" class="toast" role="status" hidden></div>
  <dialog id="editor-dialog" class="editor-dialog"><div class="dialog-heading"><div><span class="eyebrow">КОНСТРУКТОР ТРЕНИРОВКИ</span><h2 id="editor-title">Новая подборка</h2></div><button class="icon-button" data-close aria-label="Закрыть редактор">×</button></div><form id="plan-form"><label class="field">Название<input id="plan-name" required minlength="2" maxlength="70" placeholder="Например, спокойная тренировка"></label><div class="section-heading"><h3>Упражнения по порядку</h3><span id="editor-counter" class="muted"></span></div><div id="editor-selected" class="editor-selected"></div><label class="field">Добавить движение<input id="editor-search" type="search" placeholder="Название или мышца"></label><div id="editor-options" class="editor-options"></div><div class="editor-save"><p>Изменения подборки доступны всем посетителям. Уже начатые занятия сохранят прежний состав.</p><button class="button primary" type="submit" data-write>Сохранить подборку</button></div></form></dialog>
  <dialog id="schedule-dialog"><div class="dialog-heading"><div><span class="eyebrow">ПОВТОРЯЕТСЯ КАЖДУЮ НЕДЕЛЮ</span><h2>Ваш ритм недели</h2></div><button class="icon-button" data-close aria-label="Закрыть расписание">×</button></div><form id="schedule-form"><p class="dialog-note">Назначьте комплексы на удобные дни. Между нагрузкой на одну группу мышц оставляйте день отдыха.</p><div id="schedule-days" class="schedule-days"></div><button class="button primary" type="submit" data-write>Сохранить расписание</button></form></dialog>
