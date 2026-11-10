@@ -23,17 +23,17 @@ const server=http.createServer(async(req,res)=>{try{
  try{
   const page=await browser.newPage({viewport:{width:320,height:740}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const url='http://127.0.0.1:'+server.address().port+'/';
-  async function login(){await page.locator('#access-password').fill(password);await page.locator('#access-form [type=submit]').click();await page.locator('#access-dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
+  async function login(){if(await page.locator('#access-dialog').isVisible()){await page.locator('#access-password').fill(password);await page.locator('#access-form [type=submit]').click();await page.locator('#access-dialog').waitFor({state:'hidden'});}await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
   await page.goto(url);await login();await page.evaluate(()=>navigator.serviceWorker.ready);
-  await page.locator('.mobile-nav [data-view=stretch]').click();await page.locator('[data-stretch-preset=lower]').click();await page.waitForSelector('[data-stretch-next]');
+  await page.locator('.mobile-nav [data-view=library]').click();await page.locator('[data-mode=stretch]').click();await page.locator('#library-routines').click();await page.locator('[data-stretch-preset=lower]').click();await page.waitForSelector('[data-stretch-next]');
   await page.locator('[data-stretch-next]').click();await page.waitForFunction(()=>document.querySelector('#stretch-guided h2')?.textContent.includes('правая'));
   await page.locator('[data-stretch-hold]').click();
   modern=true;await page.evaluate(async()=>{const registration=await navigator.serviceWorker.getRegistration();await registration.update();});
   await page.waitForFunction(async()=>!!(await navigator.serviceWorker.getRegistration())?.waiting);
   await page.locator('#update-notice').waitFor();await page.locator('[data-defer-update]').click();assert.equal(await page.locator('#update-notice').isVisible(),false);
-  await page.locator('#settings-open').click();assert(await page.locator('#update-app').isVisible());await page.locator('#update-app').click();
-  await page.locator('#access-password').waitFor({timeout:30000});await login();
-  await page.locator('.mobile-nav [data-view=stretch]').click();await page.locator('[data-stretch-resume]').click();assert.match(await page.locator('#stretch-guided h2').innerText(),/правая/);assert.match(await page.locator('.timer-description').innerText(),/паузе/);
+  await page.locator('#settings-open').click();assert(await page.locator('#update-app').isVisible());const reloaded=page.waitForEvent('load');await page.locator('#update-app').click();
+  await reloaded;await page.waitForFunction(()=>!document.body.classList.contains('access-locked'));await login();
+  await page.locator('.mobile-nav [data-view=library]').click();await page.locator('[data-mode=stretch]').click();await page.locator('#library-routines').click();await page.locator('[data-stretch-resume]').click();assert.match(await page.locator('#stretch-guided h2').innerText(),/правая/);assert.match(await page.locator('.timer-description').innerText(),/паузе/);
   assert.deepEqual(errors,[]);console.log('PASS: actual service worker update, visible notice, defer, 320px settings, manual update/reload, preserved stretch side and paused timer.');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -274,7 +274,14 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
   return {
     start,suspend,resume:()=>session&&showStep(),
     get current(){return session?.day;},
-    sync(days){
+    forget(id){
+      if(session?.day?.id!==id)return;
+      suspend();stopTimer();keepAwake(false);session=null;timer=null;lastStored='';localStorage.removeItem(resumeKey);showHome();
+    },
+    sync(days,activeIds){
+      if(session&&!session.day.local&&Array.isArray(activeIds)&&!activeIds.includes(session.day.id)){
+        suspend();stopTimer();keepAwake(false);session=null;timer=null;lastStored='';localStorage.removeItem(resumeKey);showHome();return;
+      }
       const day=days.find(item=>item.id===session?.day?.id);
       if(!day||saving||session.day.local)return;
       if(day.finished_at){if(!root.hidden&&!guided.hidden)showHome();session=null;timer=null;localStorage.removeItem(resumeKey);resume.hidden=true;return;}

@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+const api=process.env.API_URL,password=process.env.JULIGYM_PASSWORD;
+assert(api?.includes('br-silent-lake-b99eu6ub')&&password,'Preview API only');
+let token;
+async function call(path,body,status=200){const response=await fetch(new URL(path,api),{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});const value=await response.json();assert.equal(response.status,status,value.error);return value;}
+token=(await call('auth',{password})).token;
+const date='2002-11-10',planId='stretch-'+randomUUID(),key={date,planId};
+const start=()=>call('stretch-start',{...key,title:'QA session controls',ids:['stretch-calves','stretch-cat-cow'],settings:{'stretch-calves':{seconds:25}}});
+const first=(await start()).session;
+await call('stretch-progress',{...key,sessionId:first.id,action:'next',revision:0,opId:randomUUID()});
+await call('discard',{...key,sessionId:first.id},400);
+const operation={...key,sessionId:first.id,opId:randomUUID()};
+const restarted=(await call('restart',operation)).session;
+assert.notEqual(restarted.id,first.id);assert.equal(restarted.stretch_state.position,0);assert.deepEqual(restarted.stretch_state.marks,{});assert.deepEqual(restarted.stretch_settings,first.stretch_settings);assert.deepEqual(restarted.stretch_ids,first.stretch_ids);
+assert.equal((await call('restart',operation)).session.id,restarted.id,'A repeated restart does not reset again');
+await call('stretch-progress',{...key,sessionId:first.id,action:'next',revision:0,opId:randomUUID()},409);
+await call('finish',{...key,sessionId:first.id,allowPartial:true},409);
+await call('discard',{...key,sessionId:restarted.id});
+await call('discard',{...key,sessionId:restarted.id});
+await call('stretch-progress',{...key,sessionId:restarted.id,action:'next',revision:0,opId:randomUUID()},409);
+let state=await call(`state?from=${date}&to=${date}`);assert(!state.sessions.some(s=>s.plan_id===planId));assert(!state.activeSessionIds.includes(restarted.id));
+const partial=(await start()).session;
+await call('stretch-progress',{...key,sessionId:partial.id,action:'next',revision:0,opId:randomUUID()});
+const finished=(await call('finish',{...key,sessionId:partial.id,allowPartial:true})).session;
+assert.equal(finished.result_status,'partial');assert.equal(finished.result_summary.stretch.done,1);
+await call('restart',{...key,sessionId:finished.id,opId:randomUUID()},409);
+state=await call(`state?from=${date}&to=${date}`);assert.equal(state.history.filter(s=>s.id===finished.id).length,1);
+const strengthDate='2002-'+String(1+Math.floor(Math.random()*12)).padStart(2,'0')+'-'+String(1+Math.floor(Math.random()*28)).padStart(2,'0');
+const strengthKey={date:strengthDate,planId:'upper'};
+const strength=(await call('start',strengthKey)).session;
+assert(!strength.finished_at,'Preview fixture date must have no completed session');
+{
+ const exercise=strength.items[0];await call('sets',{...strengthKey,sessionId:strength.id,exerciseId:exercise.id,setIndex:0,done:true,opId:randomUUID()});
+ const restartBody={...strengthKey,sessionId:strength.id,opId:randomUUID()};
+ const [a,b]=await Promise.all([call('restart',restartBody),call('restart',restartBody)]);assert.equal(a.session.id,b.session.id);assert.deepEqual(a.session.marks,{});assert.deepEqual(a.session.items,strength.items);
+ await call('sets',{...strengthKey,sessionId:strength.id,exerciseId:exercise.id,setIndex:0,done:true,opId:randomUUID()},409);
+ await call('discard',{...strengthKey,sessionId:a.session.id});
+}
+console.log('PASS: preview restart of strength/stretch, immutable dose, idempotent/concurrent restart, stale-window rejection, empty cancel, no resurrection after deletion, and one partial history entry.');

@@ -24,7 +24,7 @@ const site=process.env.SITE_URL||'http://127.0.0.1:4173/';assert(/^http:\/\/(127
    return route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
   });
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  async function enter(){await page.locator('#access-password').fill('local-ui-fixture');await page.locator('#access-form [type=submit]').click();await page.locator('#access-dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
+  async function enter(){if(await page.locator('#access-dialog').isVisible()){await page.locator('#access-password').fill('local-ui-fixture');await page.locator('#access-form [type=submit]').click();await page.locator('#access-dialog').waitFor({state:'hidden'});}await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
   async function switchToday(){await page.setViewportSize({width:1366,height:768});await page.locator('.sidebar [data-view=today]').click();await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForResponse(response=>response.url().includes('/qa-api/state'));}
   async function controlsVisible(timer=false){
    await page.waitForFunction(()=>{const button=document.querySelector('#guided-mark'),r=button?.getBoundingClientRect();return r&&r.top>=0&&r.bottom<=innerHeight;});
@@ -56,8 +56,8 @@ const site=process.env.SITE_URL||'http://127.0.0.1:4173/';assert(/^http:\/\/(127
   data={plans:[stretchPlan],schedule:{weekdays:{[dayIndex(date)]:stretchPlan.id},revision:1},sessions:[],history:[]};await switchToday();
   assert.equal(await page.locator('.mode-switch [aria-pressed=true]').innerText(),'Растяжка');assert.equal(await page.locator('#sidebar-caption').innerText(),'БИБЛИОТЕКА РАСТЯЖКИ');
   await page.locator('[data-mode=strength]').click();assert(await page.locator('#library-view').isVisible());assert.equal(await page.locator('.mode-switch [aria-pressed=true]').innerText(),'Силовые');
-  await switchToday();await page.locator('#search').fill('сфинкс');assert(await page.locator('#stretch-view').isVisible());assert.deepEqual(await page.locator('#stretch-grid h3').allTextContents(),['Низкий «Сфинкс»']);
-  await switchToday();await page.locator('#muscle-groups [data-group=legs]').click();assert(await page.locator('#stretch-view').isVisible());assert.equal(await page.locator('.mode-switch [aria-pressed=true]').innerText(),'Растяжка');
+  await switchToday();await page.locator('#search').fill('сфинкс');assert(await page.locator('#library-view').isVisible());assert.deepEqual(await page.locator('#library-grid h3').allTextContents(),['Низкий «Сфинкс»']);
+  await switchToday();await page.locator('#muscle-groups [data-group=legs]').click();assert(await page.locator('#library-view').isVisible());assert.equal(await page.locator('.mode-switch [aria-pressed=true]').innerText(),'Растяжка');
   const mixed={...session,items:[{id:'back01',sets:1,reps:'8',rest:45}],stretch_ids:['stretch-calves'],marks:{'back01:0:1':true}};
   data.sessions=[mixed];await switchToday();assert.equal(await page.locator('.mode-switch [aria-pressed=true]').innerText(),'Силовые');
   mixed.marks['back01:0:2']=true;await switchToday();assert.equal(await page.locator('.mode-switch [aria-pressed=true]').innerText(),'Растяжка');

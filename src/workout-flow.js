@@ -8,6 +8,13 @@ const numberForm = new Intl.PluralRules('ru');
 const approachNouns = {one:'подход', few:'подхода', many:'подходов'};
 const savedApproaches = ({done, total}) => `Сохранено подходов · ${done} из ${total}`;
 
+function sessionChoices(session){
+ if(!session||session.finished_at)return '';
+ const worked=sessionResult(session).worked;
+ return `<div class="session-choices"><button class="button quiet" data-session-stop="${esc(session.id)}" data-write>${worked?'Завершить и сохранить':'Отменить занятие'}</button>
+ <details class="restart-choice"><summary>Начать заново</summary><p>Сбросим отметки и таймер этого занятия. Упражнения и нагрузка останутся прежними.</p><button class="button secondary" data-session-restart="${esc(session.id)}" data-write>Сбросить и начать</button></details></div>`;
+}
+
 function todayAction(date, planId, label, finished = false) {
   const action = finished ? 'data-today-details' : 'data-today-start data-write';
   return `<button class="button primary flow-primary" ${action} data-workout-date="${esc(date)}" data-workout-plan="${esc(planId)}">${icon(finished ? 'arrow' : 'play')} ${label}</button>`;
@@ -48,12 +55,13 @@ export function todayMarkup(data, date) {
       ${!session?.finished_at?`<small class="time-note">${estimateHint(session||plan)}</small>`:''}
       ${session ? `<p class="today-next">${session.finished_at ? 'Сохранено в дневнике' : continuation?.next||next}</p>${progressBar(continuation?.progress||progress)}<small>${continuation?savedStretch(continuation.progress):savedApproaches(progress)+(session.finished_at&&stretchIds.length?' · '+savedStretch(stretchProgress(session)):'')}</small>` : ''}
       <div class="flow-actions">${todayAction(date, session?.plan_id || plan.id, session?.finished_at ? 'Посмотреть занятие' : continuation?.action||(session ? 'Продолжить' : 'Начать тренировку'), !!session?.finished_at)}</div>
+      ${sessionChoices(session)}
     </div>`;
   } else if(stretchIds.length){
     main = `<div class="today-card today-featured"><span class="eyebrow">${session?.finished_at?(session.result_status==='partial'?'Частично выполнено':'Выполнено'):session?'В процессе':'По расписанию'}</span>
       <h2>Растяжка · ${esc(title)}</h2><p>По плану ${estimateLabel(session||plan)} · движений: ${stretchIds.length}${session&&(!session.finished_at||session.result_summary)?` · выполнено шагов: ${stretchProgress(session).done} из ${stretchProgress(session).total}`:''}</p>
       ${!session?.finished_at?`<small class="time-note">${estimateHint(session||plan)}</small>`:''}
-      <div class="flow-actions"><button class="button primary flow-primary" data-day-start ${session?.finished_at?'':'data-write'} data-workout-date="${date}" data-workout-plan="${esc(session?.plan_id||plan.id)}">${icon('play')} ${session?.finished_at?'Посмотреть результат':session?'Продолжить':'Начать растяжку'}</button></div></div>`;
+      <div class="flow-actions"><button class="button primary flow-primary" data-day-start ${session?.finished_at?'':'data-write'} data-workout-date="${date}" data-workout-plan="${esc(session?.plan_id||plan.id)}">${icon('play')} ${session?.finished_at?'Посмотреть результат':session?'Продолжить':'Начать растяжку'}</button></div>${sessionChoices(session)}</div>`;
   } else {
     main = `<div class="today-card">
       <h2>${data.plans.length ? 'День отдыха' : 'Расписание тренировок'}</h2>
@@ -69,6 +77,7 @@ export function todayMarkup(data, date) {
     <div><span class="eyebrow">Незавершённое занятие · ${formatDate(previous.workout_date)}</span><h3>${esc(previous.title)}</h3>
       <p>${previousStretch?.next||(previous.items.length?(previousStep ? `${byId[previousStep.item.id].title} · подход ${previousStep.setIndex + 1} из ${previousStep.item.sets}${previousStep.side?' · '+(previousStep.side===1?'левая сторона':'правая сторона'):''}` : 'Все подходы отмечены'):`Растяжка · движений в плане: ${previous.stretch_ids.length}`)}</p>${previous.items.length?`<small>${previousStretch?savedStretch(previousStretch.progress):savedApproaches(saved)}</small>`:''}</div>
     ${previous.items.length?todayAction(previous.workout_date, previous.plan_id, previousStretch?.action||'Продолжить занятие'):`<button class="button primary flow-primary" data-day-start data-write data-workout-date="${previous.workout_date}" data-workout-plan="${esc(previous.plan_id)}">Продолжить растяжку</button>`}
+    ${sessionChoices(previous)}
   </div>`;
 }
 

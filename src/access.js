@@ -1,8 +1,20 @@
 const dialog=document.querySelector('#access-dialog'),form=document.querySelector('#access-form'),input=document.querySelector('#access-password'),error=document.querySelector('#access-error'),submit=form.querySelector('[type=submit]');
 const verifierKey='juligym2:access-verifier';
+const tabKey='juligym2:tab-access',lifetime=8*60*60*1000;
 let unlocked=false,token='',waiting=[],checking=false;
 export const accessToken=()=>token;
 export const isUnlocked=()=>unlocked;
+function rememberTab(expiresAt){
+ const latest=Date.now()+lifetime;
+ try{sessionStorage.setItem(tabKey,JSON.stringify({token,expiresAt:Number.isFinite(expiresAt)?Math.min(expiresAt,latest):latest}));}catch{}
+}
+function restoreTab(){
+ try{
+  const saved=JSON.parse(sessionStorage.getItem(tabKey));
+  if(!saved||typeof saved.token!=='string'||saved.token.length>512||!Number.isFinite(saved.expiresAt)||saved.expiresAt<=Date.now()||saved.expiresAt>Date.now()+lifetime){sessionStorage.removeItem(tabKey);return false;}
+  token=saved.token;unlocked=true;if(dialog.open)dialog.close();document.body.classList.remove('access-locked');return true;
+ }catch{return false;}
+}
 const hex=bytes=>Array.from(bytes,n=>n.toString(16).padStart(2,'0')).join('');
 async function verifier(password,salt){
  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);
@@ -20,16 +32,17 @@ async function authenticate(password){
  try{const result=await fetch(new URL('auth',window.JULIGYM_CONFIG.apiUrl),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password}),signal:controller.signal,cache:'no-store',credentials:'omit'});
   if(result.status>=500)throw new TypeError('unavailable');
   const value=await result.json();if(!result.ok)throw Error(value.error||'Не удалось проверить пароль.');
-  if(typeof value.token!=='string')throw Error('Не удалось проверить пароль.');return value.token;
+  if(typeof value.token!=='string'||!value.token)throw Error('Не удалось проверить пароль.');return value;
  }finally{clearTimeout(timer);}
 }
 export function unlockSite(){
- if(unlocked)return Promise.resolve();
+ if(unlocked||restoreTab())return Promise.resolve();
  document.body.classList.add('access-locked');
  if(dialog.open)dialog.close();dialog.showModal();input.focus({preventScroll:true});
  return new Promise(resolve=>waiting.push(resolve));
 }
 export function lockAccess(message='Введите пароль для доступа к дневнику.'){
+ try{sessionStorage.removeItem(tabKey);}catch{}
  if(!unlocked&&dialog.open)return;
  unlocked=false;token='';document.dispatchEvent(new Event('juligym:locked'));error.textContent=message;void unlockSite();
 }
@@ -39,8 +52,8 @@ form.addEventListener('submit',async event=>{
  event.preventDefault();if(checking)return;checking=true;submit.disabled=true;submit.textContent='Проверяем…';error.textContent='';input.setAttribute('aria-invalid','false');
  const password=input.value;
  try{
-  try{token=await authenticate(password);await rememberVerifier(password);}catch(e){
-   if(e instanceof TypeError||e.name==='AbortError'){if(!await offlineMatches(password))throw Error('Нет связи с дневником. Для первого входа нужен интернет; проверьте пароль и соединение.');token='';}
+  try{const access=await authenticate(password);token=access.token;await rememberVerifier(password);rememberTab(access.expiresAt);}catch(e){
+   if(e instanceof TypeError||e.name==='AbortError'){if(!await offlineMatches(password))throw Error('Нет связи с дневником. Для первого входа нужен интернет; проверьте пароль и соединение.');token='';rememberTab();}
    else throw e;
   }
   unlocked=true;input.value='';input.type='password';document.querySelector('#access-show').textContent='Показать';document.querySelector('#access-show').setAttribute('aria-pressed','false');dialog.close();document.body.classList.remove('access-locked');waiting.splice(0).forEach(resolve=>resolve());document.dispatchEvent(new Event('juligym:unlocked'));

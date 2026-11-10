@@ -38,7 +38,7 @@ const site=process.env.SITE_URL||'http://127.0.0.1:4173/';assert(/^http:\/\/(127
   });
   page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(site);
  }
- async function login(){await page.locator('#access-password').fill('fixture');await page.locator('#access-password').press('Enter');await page.locator('#access-dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
+ async function login(){if(await page.locator('#access-dialog').isVisible()){await page.locator('#access-password').fill('fixture');await page.locator('#access-password').press('Enter');await page.locator('#access-dialog').waitFor({state:'hidden'});}await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
  async function onScreen(selector){
   await page.waitForFunction(s=>{const n=document.querySelector(s),r=n?.getBoundingClientRect();return r&&r.width>0&&r.top>=0&&r.bottom<=innerHeight&&r.x>=0&&r.right<=innerWidth&&n.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));},selector);
  }

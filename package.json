@@ -20,7 +20,9 @@
     "test:pwa": "node scripts/check-pwa.cjs",
     "test:access": "node scripts/check-access.cjs",
     "test:session": "node scripts/check-first-package.cjs",
-    "test:update": "node scripts/check-session-update.cjs"
+    "test:update": "node scripts/check-session-update.cjs",
+    "test:navigation": "node scripts/check-navigation.cjs",
+    "test:controls": "node scripts/check-session-controls.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

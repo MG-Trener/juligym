@@ -68,8 +68,8 @@ export default {async fetch(request){
   if(!validAccess(request.headers.get('authorization'),process.env.DATABASE_URL))throw new InputError('Введите пароль, чтобы открыть дневник.',401);
   if(request.method==='GET' && route==='/state'){
    const from=dateValue(url.searchParams.get('from')),to=dateValue(url.searchParams.get('to'));if(Date.parse(to)-Date.parse(from)>42*86400000 || from>to)throw new InputError('Период — не более 42 дней.');
-   const [plans,schedule,sessions,history]=await Promise.all([pool.query("SELECT * FROM juli_plans ORDER BY CASE id WHEN 'legs' THEN 0 WHEN 'upper' THEN 1 WHEN 'core' THEN 2 ELSE 3 END,created_at,id"),pool.query('SELECT * FROM juli_schedule WHERE id=1'),pool.query('SELECT * FROM juli_sessions WHERE workout_date BETWEEN $1 AND $2 ORDER BY workout_date',[from,to]),pool.query('SELECT id,workout_date,plan_id,title,started_at,finished_at,duration_seconds,result_status,result_summary FROM juli_sessions WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 200')]);
-   return reply({plans:plans.rows,schedule:schedule.rows[0],sessions:sessions.rows.map(serialize),history:history.rows.map(serialize),serverTime:new Date().toISOString()});
+   const [plans,schedule,sessions,history,active]=await Promise.all([pool.query("SELECT * FROM juli_plans ORDER BY CASE id WHEN 'legs' THEN 0 WHEN 'upper' THEN 1 WHEN 'core' THEN 2 ELSE 3 END,created_at,id"),pool.query('SELECT * FROM juli_schedule WHERE id=1'),pool.query('SELECT * FROM juli_sessions WHERE workout_date BETWEEN $1 AND $2 ORDER BY workout_date',[from,to]),pool.query('SELECT id,workout_date,plan_id,title,started_at,finished_at,duration_seconds,result_status,result_summary FROM juli_sessions WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 200'),pool.query('SELECT id FROM juli_sessions WHERE finished_at IS NULL')]);
+   return reply({plans:plans.rows,schedule:schedule.rows[0],sessions:sessions.rows.map(serialize),history:history.rows.map(serialize),activeSessionIds:active.rows.map(row=>row.id),serverTime:new Date().toISOString()});
   }
   if(request.method!=='POST')throw new InputError('Неизвестный адрес.',404);
   const body=await readJson(request);
@@ -89,6 +89,23 @@ export default {async fetch(request){
    return reply(await transaction(c=>changeDay(c,edit)));
   }
   const date=dateValue(body.date);const currentDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Qyzylorda'});if(date>currentDate)throw new InputError('Будущие дни доступны только для планирования.');if(!/^[a-zA-Z0-9-]{1,50}$/.test(body.planId||''))throw new InputError('Выберите комплекс.');
+  if(['/restart','/discard'].includes(route))return reply(await transaction(async c=>{
+   if(!/^[0-9a-f-]{36}$/i.test(body.sessionId||''))throw new InputError('Откройте занятие ещё раз.');
+   if(route==='/restart'&&!/^[0-9a-f-]{36}$/i.test(body.opId||''))throw new InputError('Некорректная операция.');
+   const current=(await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2 FOR UPDATE',[date,body.planId])).rows[0];
+   if(route==='/restart'){
+    const replay=(await c.query('SELECT s.* FROM juli_operations o JOIN juli_sessions s ON s.id=o.session_id WHERE o.id=$1',[body.opId])).rows[0];
+    if(replay){if(serialize(replay).workout_date!==date||replay.plan_id!==body.planId)throw new InputError('Некорректная операция.');return {session:serialize(replay),replacedSessionId:body.sessionId};}
+   }
+   if(!current&&route==='/discard')return {discardedSessionId:body.sessionId};
+   if(!current||current.id!==body.sessionId||current.finished_at)throw new InputError('Занятие уже изменено. Обновите дневник.',409);
+   if(route==='/discard'&&sessionResult(current).worked)throw new InputError('Есть выполненные упражнения. Сохраните частичный результат.');
+   await c.query('DELETE FROM juli_operations WHERE session_id=$1',[current.id]);
+   if(route==='/discard'){await c.query('DELETE FROM juli_sessions WHERE id=$1',[current.id]);return {discardedSessionId:current.id};}
+   const next=(await c.query("UPDATE juli_sessions SET id=$2,marks='{}',stretch_state='{\"position\":0,\"marks\":{}}',stretch_revision=0,started_at=now(),duration_seconds=0,result_status=NULL,result_summary=NULL WHERE id=$1 RETURNING *",[current.id,randomUUID()])).rows[0];
+   await c.query('INSERT INTO juli_operations(id,session_id) VALUES($1,$2)',[body.opId,next.id]);
+   return {session:serialize(next),replacedSessionId:current.id};
+  }));
   const result=await transaction(async c=>{
    if(route==='/stretch-start'){
     if(!/^stretch-[0-9a-f-]{36}$/i.test(body.planId)||typeof body.title!=='string'||body.title.trim().length<2||body.title.length>70||!Array.isArray(body.ids)||!body.ids.length||body.ids.length>20||new Set(body.ids).size!==body.ids.length||body.ids.some(id=>!Object.hasOwn(stretchById,id)))throw new InputError('Проверьте подборку растяжки.');
@@ -100,8 +117,9 @@ export default {async fetch(request){
     await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items,stretch_ids,stretch_settings) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workout_date,plan_id) DO NOTHING',[body.planId.slice(8),date,body.planId,body.title.trim(),'[]',JSON.stringify(body.ids),JSON.stringify(settings)]);
     return (await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2',[date,body.planId])).rows[0];
    }
-   const session=await ensureSession(c,date,body.planId);
-   if(route==='/start')return session;
+   if(route==='/start')return ensureSession(c,date,body.planId);
+   const session=(await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2 FOR UPDATE',[date,body.planId])).rows[0];
+   if(!session||(body.sessionId&&body.sessionId!==session.id))throw new InputError('Занятие удалено или начато заново. Обновите дневник.',409);
    if(route==='/stretch-progress'){
     if(session.finished_at)throw new InputError('Занятие уже сохранено.',409);
     if(!['next','previous','skip'].includes(body.action)||!session.stretch_ids.length)throw new InputError('Некорректный шаг растяжки.');

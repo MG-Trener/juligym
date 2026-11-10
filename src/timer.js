@@ -1,7 +1,11 @@
 import {icon} from './icons.js';
 
 const element=document.querySelector('#timer'),observers=new Set();
-let context,deadline=0,remaining=0,running=false,interval,voices=[],generation=0,sound=true;
+let context,master,deadline=0,remaining=0,running=false,interval,voices=[],generation=0,sound=true;
+const volume=()=>{try{const value=localStorage.getItem('juligym2:sound-volume'),number=Number(value);return value===null||!Number.isFinite(number)? .75:Math.max(0,Math.min(1,number/100));}catch{return .75;}};
+function updateVolume(){if(master)master.gain.value=volume();}
+document.addEventListener('juligym:volume',updateVolume);
+addEventListener('storage',event=>{if(event.key==='juligym2:sound-volume')updateVolume();});
 let timerTitle='',timerFinish='',timerDuration=0,pauseReason='';
 let workoutAwake=false,screen=null,wakePending=false,wakeIssue=false,pageActive=true;
 try{sound=localStorage.getItem('juligym2:sound')!=='off';}catch{}
@@ -41,8 +45,8 @@ function cancelAudio(){generation++;voices.forEach(node=>{try{node.stop();node.d
 function tone(time,frequency,duration=.1){
  const oscillator=context.createOscillator(),gain=context.createGain();
  oscillator.frequency.value=frequency;gain.gain.setValueAtTime(0,time);
- gain.gain.linearRampToValueAtTime(.07,time+.008);gain.gain.exponentialRampToValueAtTime(.001,time+duration);
- oscillator.connect(gain);gain.connect(context.destination);oscillator.start(time);oscillator.stop(time+duration+.02);voices.push(oscillator);
+ gain.gain.linearRampToValueAtTime(.18,time+.008);gain.gain.exponentialRampToValueAtTime(.001,time+duration);
+ oscillator.connect(gain);gain.connect(master);oscillator.start(time);oscillator.stop(time+duration+.02);voices.push(oscillator);
  oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();voices=voices.filter(node=>node!==oscillator);};
 }
 function soundNote(){
@@ -50,17 +54,22 @@ function soundNote(){
  const text=sound&&running&&context?.state!=='running'?'Для звука нажмите кнопку «Звук».':'При сворачивании — пауза. Продолжите, когда готовы.';
  if(note&&note.textContent!==text)note.textContent=text;
 }
-function prepareAudio(){
- if(!sound)return Promise.resolve(false);
+function prepareAudio(preview=false){
+ if(!sound&&!preview)return Promise.resolve(false);
  try{
   if(!context||context.state==='closed'){
    context=new (window.AudioContext||window.webkitAudioContext)();
+   master=context.createGain();master.connect(context.destination);updateVolume();
    context.addEventListener('statechange',soundNote);
   }
   // Called in the original click, before any network request loses user activation.
   const resume=context.resume();soundNote();
   return resume.then(()=>{soundNote();return context.state==='running';},()=>{soundNote();return false;});
  }catch{soundNote();return Promise.resolve(false);}
+}
+export async function previewTimerSound(){
+ if(!await prepareAudio(true))return;
+ const time=context.currentTime+.02;tone(time,660,.18);tone(time+.25,1046,.22);
 }
 async function audio(seconds,end=false){
  cancelAudio();if(!sound||document.visibilityState!=='visible'||!pageActive)return;
