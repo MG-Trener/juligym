@@ -57,6 +57,9 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
   function suspend(){if(active){timer=timerSnapshot();persist();}active=false;}
   observeTimer(value=>{if(active&&session){timer=value;persist();}});
   addEventListener('pagehide',suspend);
+  addEventListener('pageshow',event=>{
+    if(event.persisted&&session&&!root.hidden&&!guided.hidden){active=true;keepAwake(!session.day.finished_at&&session.position<session.steps.length);}
+  });
   function bindDay(day){
     session={title:day.title,steps:stretchSteps(day.stretch_ids),exerciseCount:day.stretch_ids.length,position:day.stretch_state?.position||0,marks:day.stretch_state?.marks||{},day,settings:day.stretch_settings||{}};
   }
@@ -106,6 +109,7 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
   }
 
   function showHome() {
+    if(active){suspend();stopTimer();keepAwake(false);}
     root.classList.remove('stretch-in-session');
     home.hidden = false;
     guided.hidden = true;
@@ -154,6 +158,8 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
       </div>${finish}`;
     }
     if(active){
+      root.querySelector('#stretch-timer-slot').append(document.querySelector('#timer'));
+      keepAwake(!!step&&!day.finished_at);
       if(timer)restoreTimer(timer);
       guided.querySelector('h2').focus({preventScroll: true});
       root.scrollIntoView({block: 'start'});
@@ -241,8 +247,12 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
     sync(days){
       const day=days.find(item=>item.id===session?.day?.id);
       if(!day||saving||session.day.local)return;
-      if(day.finished_at){session=null;timer=null;localStorage.removeItem(resumeKey);if(active)showHome();return;}
-      if(day.stretch_revision!==(session.day.stretch_revision||0)){bindDay(day);timer=null;persist();if(active)showStep();}
+      if(day.finished_at){if(active)showHome();session=null;timer=null;localStorage.removeItem(resumeKey);resume.hidden=true;return;}
+      if(day.stretch_revision!==(session.day.stretch_revision||0)){
+        const wasActive=active;
+        if(wasActive){suspend();stopTimer();}
+        bindDay(day);timer=null;persist();if(wasActive)showStep();
+      }
     },
     get filters() { return {group, query}; },
     filterCatalog({group: nextGroup = group, query: nextQuery = query}) {

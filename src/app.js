@@ -4,7 +4,7 @@ import {icon,anatomy} from './icons.js';
 import {today,addDays,weekStart,dayIndex,summary,estimateLabel,formatDate,firstPendingSet,plannedWorkout,sessionForDate,escape as esc} from './state.js';
 import {request} from './api.js';
 import {isUnlocked,lockAccess} from './access.js';
-import {startTimer,stopTimer,keepAwake} from './timer.js';
+import {startTimer,stopTimer,keepAwake,observeTimer,timerSnapshot,restoreTimer} from './timer.js';
 import {initStretch} from './stretch.js';
 import {stretches,stretchById} from './stretch-catalog.js';
 import {todayMarkup,guidedMarkup,finishChoice} from './workout-flow.js';
@@ -69,6 +69,27 @@ closeSidebar();
 const selected=()=>data.plans.find(p=>p.id===selectedPlan);
 const currentSession=()=>data.sessions.find(s=>s.workout_date===selectedDate && s.plan_id===selectedPlan);
 const currentItems=()=>currentSession()?.items||selected()?.items||[];
+const strengthTimerKey='juligym2:strength-timer-v1';
+let strengthTimerOwner=null,lastStrengthTimer='';
+function saveStrengthTimer(timer){
+ if(!strengthTimerOwner)return;
+ try{
+  if(!timer){localStorage.removeItem(strengthTimerKey);lastStrengthTimer='';return;}
+  const value=JSON.stringify({owner:strengthTimerOwner,timer});
+  if(value!==lastStrengthTimer){localStorage.setItem(strengthTimerKey,value);lastStrengthTimer=value;}
+ }catch{}
+}
+function suspendStrengthTimer(){saveStrengthTimer(timerSnapshot());strengthTimerOwner=null;}
+function syncStrengthTimer(session){
+ const pending=session&&!session.finished_at&&firstPendingSet(session);
+ const owner=pending?`${session.id}|${pending.item.id}:${pending.setIndex}:${pending.side||0}`:null;
+ if(owner!==strengthTimerOwner){
+  saveStrengthTimer(null);strengthTimerOwner=null;stopTimer();strengthTimerOwner=owner;
+  if(owner)try{const saved=JSON.parse(localStorage.getItem(strengthTimerKey));if(saved?.owner===owner)restoreTimer(saved.timer);}catch{}
+ }
+ keepAwake(!!owner);
+}
+observeTimer(value=>saveStrengthTimer(value));
 function notify(message,error=false){const box=$('#toast');box.textContent=message;box.classList.toggle('error',error);box.hidden=false;clearTimeout(ui.toast);ui.toast=setTimeout(()=>box.hidden=true,5000);}
 function setConnection(ok,message){online=ok;$('#connection').innerHTML=`<i class="status-dot ${ok?'':'offline'}"></i>${esc(message|| (ok?'Общий дневник · сохранено в Neon':'Нет связи · данные из последней загрузки'))}`;$('#connection').setAttribute('title','Один общий дневник Юли. Изменения видны всем посетителям.');renderBusy();}
 function cacheDiary(){
@@ -312,6 +333,7 @@ function render(){
  }
  if(view==='guided'){
   const session=currentSession();
+  if(isUnlocked())syncStrengthTimer(session);
   const key=JSON.stringify(session);
   if(key!==guidedKey){
    $('#guided-title').textContent=session?.title||'Силовая тренировка';
@@ -435,9 +457,10 @@ async function finishDayStretch(date,planId){
 }
 
 function setView(next,closeMenu=true){
+ if(view!==next&&view==='guided')suspendStrengthTimer();
  if(view!==next&&view==='stretch')stretch.suspend();
  if(view!==next&&(['stretch','guided'].includes(view)||['stretch','guided'].includes(next))){stopTimer();keepAwake(false);}
- if(view==='guided'&&next!=='guided')document.body.insertBefore($('#timer'),$('#toast'));
+ if(['guided','stretch'].includes(view)&&next!==view)document.body.insertBefore($('#timer'),$('#toast'));
  if(view!=='guided'&&next==='guided')$('#guided-timer-slot').append($('#timer'));
  view=next;
  if(['day','today','workout','guided','library'].includes(view))strengthView=view;
@@ -516,7 +539,7 @@ function openSchedule(){
 document.addEventListener('click',async event=>{
  if(!isUnlocked())return;
  const hint=event.target.closest('.technique>summary');if(hint){event.preventDefault();const panel=hint.parentElement;openTechnique=panel.open?null:panel.dataset.technique;document.querySelectorAll('.technique').forEach(d=>d.open=d.dataset.technique===openTechnique);return;}
- if(event.target.closest('#lock-access')){stretch.suspend();stopTimer();keepAwake(false);lockAccess();return;}
+ if(event.target.closest('#lock-access')){suspendStrengthTimer();stretch.suspend();stopTimer();keepAwake(false);lockAccess();return;}
  const b=event.target.closest('button');if(!b)return;
  if(b.hasAttribute('data-day-undo')){await undoRemoval();return;}
  if(b.hasAttribute('data-dismiss-undo')){rememberUndo(null);return;}
@@ -675,8 +698,9 @@ document.addEventListener('keydown',e=>{if(!isUnlocked())return;if(e.key==='Esca
 document.querySelectorAll('dialog').forEach(d=>{d.addEventListener('close',()=>{renderUndo();renderBusy();});const h=d.querySelector('h2');if(h){h.id ||= d.id+'-heading';d.setAttribute('aria-labelledby',h.id);}});
 document.querySelectorAll('dialog:not(#access-dialog)').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busy)load(true);});
+addEventListener('pageshow',event=>{if(event.persisted&&!busy)load(true);});
 document.addEventListener('juligym:unlocked',()=>load(true));
-document.addEventListener('juligym:locked',()=>{stretch.suspend();stopTimer();keepAwake(false);});
+document.addEventListener('juligym:locked',()=>{suspendStrengthTimer();stretch.suspend();stopTimer();keepAwake(false);});
 addEventListener('online',()=>load(true));addEventListener('offline',()=>setConnection(false));
 setInterval(()=>{if(document.visibilityState==='visible'&&!busy&&!document.querySelector('dialog[open]'))load(true);},20000);
 $('#year').textContent=new Date().getFullYear();$('#sidebar-backdrop').innerHTML='';
@@ -687,6 +711,6 @@ document.addEventListener('juligym:before-update',event=>{
  event.detail.prepare=(async()=>{
   await doseSaves.flush();
   if(busy||doseSaves.unsaved){notify('Дождитесь сохранения изменений перед обновлением.',true);return false;}
-  stretch.suspend();stopTimer();keepAwake(false);return true;
+  suspendStrengthTimer();stretch.suspend();stopTimer();keepAwake(false);return true;
  })();
 });

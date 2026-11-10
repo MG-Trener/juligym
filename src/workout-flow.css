@@ -141,7 +141,12 @@ body:has(dialog[open]) > #undo-remove { display:none; }
 .guided-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 16px; padding: 10px 14px; border-block: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 .guided-meta strong { color: var(--accent); }
 #guided-view .exercise-art > img { aspect-ratio: 2; }
-#guided-timer-slot .timer { position: static; transform: none; width: 100%; margin: 0 0 12px; box-shadow: none; }
+#guided-timer-slot .timer, #stretch-timer-slot .timer { position: static; transform: none; width: 100%; margin: 0 0 12px; box-shadow: none; }
+#stretch-timer-slot .timer { margin-top: 12px; }
+.timer-note { display: block; color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 8px; }
+.timer-head > button { min-width: 44px; min-height: 44px; }
+.timer-body > button { min-width: 44px; min-height: 44px; }
+.timer-body > button[data-timer-toggle] { width: auto; font-size: 14px; flex-shrink: 0; }
 .guided-actions { margin: 10px 0 16px; }
 .flow-finished > .icon { width: 34px; height: 34px; color: var(--accent); }
 @media (max-width: 1000px) {

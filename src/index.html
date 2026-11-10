@@ -69,6 +69,7 @@
     <button class="button quiet" data-view="workout">Весь комплекс</button>
    </div>
    <p id="guided-offline" class="flow-offline" hidden>Отметка подходов доступна с интернетом.</p>
+   <p class="flow-save-note" data-awake-note hidden></p>
    <div id="guided-timer-slot"></div>
    <div id="guided-content"></div>
   </section>
@@ -96,6 +97,8 @@
     <div id="stretch-grid" class="exercise-grid"></div>
    </div>
    <div id="stretch-guided" hidden></div>
+   <div id="stretch-timer-slot"></div>
+   <p class="flow-save-note" data-awake-note hidden></p>
   </section>
   <footer class="footer"><span>Моя домашняя тренировка © <span id="year"></span></span><span>В своём темпе. Шаг за шагом.</span><button class="text-button" onclick="document.querySelector('#about-dialog').showModal()">О программе</button></footer>
  </main>
