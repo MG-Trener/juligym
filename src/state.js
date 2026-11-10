@@ -38,3 +38,11 @@ export function todaySelection(data, date) {
     previous: recent.find(item => item.workout_date < date && !item.finished_at)
   };
 }
+
+export function todayWorkoutMode(data,date=today()) {
+ const {session,plan}=todaySelection(data,date),workout=session||plan;
+ if(!workout?.stretch_ids?.length)return 'strength';
+ if(!workout.items?.length)return 'stretch';
+ // A mixed session advances to stretching only after both sides of every set.
+ return session&&!session.finished_at&&!pendingSet(session)?'stretch':'strength';
+}

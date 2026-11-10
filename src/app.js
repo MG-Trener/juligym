@@ -1,7 +1,7 @@
 import {separateSides,setDone,sideDone,sessionResult,stretchProgress,advanceStretch,stretchSteps} from './session-progress.js';
 import {exercises,groups,byId} from './catalog.js';
 import {icon,anatomy} from './icons.js';
-import {today,addDays,weekStart,dayIndex,summary,estimateLabel,formatDate,firstPendingSet,plannedWorkout,sessionForDate,escape as esc} from './state.js';
+import {today,addDays,weekStart,dayIndex,summary,estimateLabel,formatDate,firstPendingSet,plannedWorkout,sessionForDate,todayWorkoutMode,escape as esc} from './state.js';
 import {request} from './api.js';
 import {isUnlocked,lockAccess} from './access.js';
 import {startTimer,stopTimer,keepAwake,observeTimer,timerSnapshot,restoreTimer} from './timer.js';
@@ -59,7 +59,7 @@ const doseSaves=createDayAutosave(async body=>{
  renderBusy();renderDoseState();
  if(!doseSaves.pending){render();if(loadedWeek!==week)void load(true);}
 });
-const activeMode=()=>view==='day'?dayMode:view==='stretch'?'stretch':'strength';
+const activeMode=()=>view==='today'?todayWorkoutMode(data):view==='day'?dayMode:view==='stretch'?'stretch':'strength';
 const catalogFilters=()=>activeMode()==='stretch'?stretch.filters:{group,query};
 try{selectedPlan=localStorage.getItem('juligym2:selected-plan')||selectedPlan;}catch{}
 const narrow=matchMedia('(max-width:1000px)');
@@ -90,6 +90,35 @@ function syncStrengthTimer(session){
  keepAwake(!!owner);
 }
 observeTimer(value=>saveStrengthTimer(value));
+function sizeGuidedDock(){
+ const dock=$('#guided-dock');if(dock.hidden)return;
+ const bounds=$('#guided-view').getBoundingClientRect();
+ dock.style.left=bounds.left+'px';dock.style.width=bounds.width+'px';
+ const height=Math.ceil(dock.getBoundingClientRect().height)+'px';
+ $('#guided-view').style.setProperty('--guided-dock-height',height);
+ document.body.style.setProperty('--guided-dock-height',height);
+}
+function syncGuidedDock(){
+ const dock=$('#guided-dock'),content=$('#guided-content'),slot=$('#guided-timer-slot');
+ const actions=content.querySelector('.guided-actions')||dock.querySelector('.guided-actions');
+ const active=view==='guided'&&!narrow.matches&&!!actions&&isUnlocked();
+ document.body.classList.toggle('has-guided-dock',active);
+ if(active){
+  if(slot.parentElement!==dock)dock.append(slot);
+  if(actions.parentElement!==dock)dock.append(actions);
+  const step=firstPendingSet(currentSession());
+  $('#guided-dock-caption').textContent=step?`${byId[step.item.id].title} · подход ${step.setIndex+1} из ${step.item.sets}${step.side?' · '+(step.side===1?'левая':'правая')+' сторона':''}`:'';
+  dock.hidden=false;sizeGuidedDock();
+ }else{
+  if(slot.parentElement===dock)content.before(slot);
+  const home=content.querySelector('.guided-actions-home');
+  if(actions&&home&&actions.parentElement!==home)home.append(actions);
+  dock.hidden=true;
+ }
+}
+const dockObserver=new ResizeObserver(sizeGuidedDock);
+dockObserver.observe($('#guided-view'));dockObserver.observe($('#guided-dock'));
+addEventListener('resize',syncGuidedDock);
 function notify(message,error=false){const box=$('#toast');box.textContent=message;box.classList.toggle('error',error);box.hidden=false;clearTimeout(ui.toast);ui.toast=setTimeout(()=>box.hidden=true,5000);}
 function setConnection(ok,message){online=ok;$('#connection').innerHTML=`<i class="status-dot ${ok?'':'offline'}"></i>${esc(message|| (ok?'Общий дневник · сохранено в Neon':'Нет связи · данные из последней загрузки'))}`;$('#connection').setAttribute('title','Один общий дневник Юли. Изменения видны всем посетителям.');renderBusy();}
 function cacheDiary(){
@@ -336,6 +365,7 @@ function render(){
   if(isUnlocked())syncStrengthTimer(session);
   const key=JSON.stringify(session);
   if(key!==guidedKey){
+   $('#guided-dock .guided-actions')?.remove();
    $('#guided-title').textContent=session?.title||'Силовая тренировка';
    $('#guided-content').innerHTML=session ? guidedMarkup(session,exerciseCard) : '<p>Занятие пока недоступно. Откройте дневник ещё раз.</p>';
    guidedKey=key;
@@ -344,7 +374,8 @@ function render(){
  $('.week-section').hidden=['today','stretch','guided'].includes(view);
  document.querySelectorAll('[data-view-panel]').forEach(panel=>panel.hidden=panel.dataset.viewPanel!==view);
  document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-current',button.dataset.view===(view==='guided'?'today':view)?'page':'false'));
- document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===(view==='stretch'?'stretch':'strength'))));
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===activeMode())));
+ syncGuidedDock();
  if($('#image-dialog').open)updateImageAction();
  renderUndo();
  renderBusy();
@@ -367,7 +398,7 @@ function openDayCatalog(mode=dayMode,focus=true){
  dayCatalogOpen=true;
  sidebar();
  renderDayCatalog();
- document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode==='strength')));
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===activeMode())));
  renderBusy();
  if(!mobileSidebar){
   if(focus)$('#day-catalog-title').focus({preventScroll:true});
@@ -582,9 +613,8 @@ document.addEventListener('click',async event=>{
   }
  }
  if(b.dataset.mode){
-  const next=b.dataset.mode==='stretch'?'stretch':'today';
+  const next=b.dataset.mode==='stretch'?'stretch':todayWorkoutMode(data)==='strength'?'today':'library';
   if(next==='stretch')stretch.openCatalog();
-  if(next==='day')dayMode='strength';
   if(next!==view)setView(next);
   return;
  }
@@ -593,6 +623,7 @@ document.addEventListener('click',async event=>{
   sidebar();
   return;
  }
+ if(view==='today'&&activeMode()==='stretch'&&(b.dataset.group||b.id==='sidebar-create'))setView('stretch');
  if(view==='stretch'){
   if(b.dataset.group){
    stretch.filterCatalog({group:b.dataset.group});
@@ -672,8 +703,10 @@ document.addEventListener('change',event=>{const e=event.target;if(e.dataset.edi
 $('#search').addEventListener('input',event=>{
  const value=event.target.value;
  if(view==='day'&&dayCatalogOpen){filterDay({query:value});return;}
+ if(view==='today'&&activeMode()==='stretch')setView('stretch',false);
  if(view==='stretch'){
   stretch.filterCatalog({query:value});
+  sidebar();
   if(!mobileSidebar)revealStretchSection('#stretch-library-title',false);
   return;
  }
@@ -683,6 +716,7 @@ $('#search').addEventListener('input',event=>{
 $('#library-search').addEventListener('submit',event=>{
  event.preventDefault();
  if(view==='day'&&dayCatalogOpen){closeSidebar();openDayCatalog();return;}
+ if(view==='today'&&activeMode()==='stretch')setView('stretch',false);
  if(view==='stretch'){
   closeSidebar();
   revealStretchSection();
@@ -700,7 +734,7 @@ document.querySelectorAll('dialog:not(#access-dialog)').forEach(d=>d.addEventLis
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busy)load(true);});
 addEventListener('pageshow',event=>{if(event.persisted&&!busy)load(true);});
 document.addEventListener('juligym:unlocked',()=>load(true));
-document.addEventListener('juligym:locked',()=>{suspendStrengthTimer();stretch.suspend();stopTimer();keepAwake(false);});
+document.addEventListener('juligym:locked',()=>{suspendStrengthTimer();stretch.suspend();stopTimer();keepAwake(false);syncGuidedDock();});
 addEventListener('online',()=>load(true));addEventListener('offline',()=>setConnection(false));
 setInterval(()=>{if(document.visibilityState==='visible'&&!busy&&!document.querySelector('dialog[open]'))load(true);},20000);
 $('#year').textContent=new Date().getFullYear();$('#sidebar-backdrop').innerHTML='';

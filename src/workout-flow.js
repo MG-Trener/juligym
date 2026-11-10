@@ -85,10 +85,10 @@ export function guidedMarkup(session, renderExercise) {
   ${progressBar(progress)}<small class="guided-count">${savedApproaches(progress)}</small>
   ${!result.worked?'<details class="flow-warmup"><summary>Сначала разминка · 5 мин</summary><p>2 минуты спокойного шага. Затем по минуте: движения плечами и локтями, неглубокие приседания с опорой, наклоны от таза и подъёмы на носки. Начните без гантелей.</p></details>':''}
   ${renderExercise(item, exerciseIndex, 'guided')}
-  <div class="flow-actions guided-actions">
+  <div class="guided-actions-home"><div class="flow-actions guided-actions">
     <button class="button primary flow-primary" id="guided-mark" data-guided-set="${item.id}:${setIndex}${side?':'+side:''}" data-write>${icon('check')} ${side===1?'Левая готова → правая':side===2?'Правая готова · подход выполнен':'Подход готов'}</button>
     ${hold > 0 && hold <= 180 ? `<button class="button secondary" data-guided-hold="${hold}">${icon('clock')} Удержание ${hold} с</button>` : ''}
-  </div>${finishChoice(session)}`;
+  </div></div>${finishChoice(session)}`;
 }
 
 export function finishChoice(session){
