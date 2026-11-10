@@ -733,7 +733,10 @@ document.querySelectorAll('dialog').forEach(d=>{d.addEventListener('close',()=>{
 document.querySelectorAll('dialog:not(#access-dialog)').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busy)load(true);});
 addEventListener('pageshow',event=>{if(event.persisted&&!busy)load(true);});
-document.addEventListener('juligym:unlocked',()=>load(true));
+document.addEventListener('juligym:unlocked',async()=>{
+ await load(true);
+ if(view==='stretch'&&!$('#stretch-guided').hidden)stretch.resume();
+});
 document.addEventListener('juligym:locked',()=>{suspendStrengthTimer();stretch.suspend();stopTimer();keepAwake(false);syncGuidedDock();});
 addEventListener('online',()=>load(true));addEventListener('offline',()=>setConnection(false));
 setInterval(()=>{if(document.visibilityState==='visible'&&!busy&&!document.querySelector('dialog[open]'))load(true);},20000);

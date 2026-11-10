@@ -154,17 +154,19 @@ body:has(dialog[open]) > #undo-remove { display:none; }
 .guided-actions { margin: 10px 0 16px; }
 .guided-dock { position: fixed; bottom: 16px; z-index: 50; display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: #182019; border: 1px solid #607b3d; border-radius: 14px; box-shadow: 0 6px 28px #0007; }
 .guided-dock > p { flex: 1; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
-.guided-dock #guided-timer-slot { flex: 1; min-width: 0; }
-.guided-dock:has(.timer:not([hidden])) > p, .guided-dock:not(:has(.timer:not([hidden]))) #guided-timer-slot { display: none; }
+.guided-dock :is(#guided-timer-slot, #stretch-timer-slot) { flex: 1; min-width: 0; }
+.guided-dock:has(.timer:not([hidden])) > p, .guided-dock:not(:has(.timer:not([hidden]))) :is(#guided-timer-slot, #stretch-timer-slot) { display: none; }
 .guided-dock .timer { padding: 0; margin: 0!important; border: 0; background: none; box-shadow: none; }
 .guided-dock .timer-head { margin-bottom: 4px; }
 .guided-dock .timer-body { flex-wrap: wrap; }
 .guided-dock .timer-body > strong { font-size: 30px; }
 .guided-dock .timer-note { font-size: 11px; margin-top: 4px; }
-.guided-dock .guided-actions { flex: 0 1 235px; flex-direction: column; align-items: stretch; margin: 0; }
-.guided-dock .guided-actions > button { min-height: 48px; white-space: normal; }
+.guided-dock :is(.guided-actions, .stretch-step-actions) { display: flex; flex: 0 1 235px; flex-direction: column; align-items: stretch; gap: 8px; margin: 0; }
+.guided-dock :is(.guided-actions, .stretch-step-actions) > button { min-height: 48px; white-space: normal; }
 body.has-guided-dock #guided-view { padding-bottom: calc(var(--guided-dock-height, 160px) + 24px); }
 body.has-guided-dock #toast { bottom: calc(var(--guided-dock-height, 160px) + 32px); }
+body.has-stretch-dock #stretch-guided { padding-bottom: calc(var(--stretch-dock-height, 160px) + 24px); }
+body.has-stretch-dock #toast { bottom: calc(var(--stretch-dock-height, 160px) + 32px); }
 .flow-finished > .icon { width: 34px; height: 34px; color: var(--accent); }
 @media (max-width: 1000px) {
   .mobile-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); padding-inline: 5px; }

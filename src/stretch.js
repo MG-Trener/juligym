@@ -54,18 +54,18 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
     if(saved?.day?.id&&!saved.day.finished_at&&Array.isArray(saved.day.stretch_ids)&&saved.day.stretch_ids.every(id=>Object.hasOwn(stretchById,id))){session=saved;timer=saved.timer;}
   }catch{}
   function persist(){if(!session)return;try{const value=JSON.stringify({...session,timer});if(value!==lastStored){localStorage.setItem(resumeKey,value);lastStored=value;}}catch{}}
-  function suspend(){if(active){timer=timerSnapshot();persist();}active=false;}
+  function suspend(){if(active){timer=timerSnapshot();persist();}active=false;syncDock();}
   observeTimer(value=>{if(active&&session){timer=value;persist();}});
   addEventListener('pagehide',suspend);
   addEventListener('pageshow',event=>{
-    if(event.persisted&&session&&!root.hidden&&!guided.hidden){active=true;keepAwake(!session.day.finished_at&&session.position<session.steps.length);}
+    if(event.persisted&&session&&!root.hidden&&!guided.hidden){active=true;syncDock();keepAwake(!session.day.finished_at&&session.position<session.steps.length);}
   });
   function bindDay(day){
     session={title:day.title,steps:stretchSteps(day.stretch_ids),exerciseCount:day.stretch_ids.length,position:day.stretch_state?.position||0,marks:day.stretch_state?.marks||{},day,settings:day.stretch_settings||{}};
   }
   async function move(action){
     if(saving||!session)return;
-    saving=true;guided.querySelectorAll('button').forEach(button=>button.disabled=true);
+    saving=true;root.querySelectorAll('#stretch-guided button,#stretch-dock button').forEach(button=>button.disabled=true);
     suspend();stopTimer();
     const result=await hooks.save?.(session.day,action);
     saving=false;
@@ -86,6 +86,33 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
   const resume = root.querySelector('#stretch-resume');
   const count = root.querySelector('#stretch-count');
   const title = root.querySelector('#stretch-library-title');
+  const dock=root.querySelector('#stretch-dock'),slot=root.querySelector('#stretch-timer-slot');
+  const narrow=matchMedia('(max-width:1000px)');
+  function sizeDock(){
+    if(dock.hidden)return;
+    const bounds=guided.getBoundingClientRect();
+    dock.style.left=bounds.left+'px';dock.style.width=bounds.width+'px';
+    document.body.style.setProperty('--stretch-dock-height',Math.ceil(dock.getBoundingClientRect().height)+'px');
+  }
+  function syncDock(){
+    const actions=guided.querySelector('.stretch-step-actions')||dock.querySelector('.stretch-step-actions');
+    const visible=active&&!root.hidden&&!guided.hidden&&!narrow.matches&&!!actions;
+    document.body.classList.toggle('has-stretch-dock',visible);
+    if(visible){
+      if(slot.parentElement!==dock)dock.append(slot);
+      if(actions.parentElement!==dock)dock.append(actions);
+      const step=session.steps[session.position],exercise=stretchById[step.id];
+      root.querySelector('#stretch-dock-caption').textContent=exercise.title+(exercise.unilateral?' · '+(step.side===1?'левая':'правая')+' сторона':'');
+      dock.hidden=false;sizeDock();
+    }else{
+      if(slot.parentElement===dock)guided.after(slot);
+      const home=guided.querySelector('.stretch-actions-home');
+      if(actions&&home&&actions.parentElement!==home)home.append(actions);
+      dock.hidden=true;
+    }
+  }
+  const dockObserver=new ResizeObserver(sizeDock);dockObserver.observe(guided);dockObserver.observe(dock);
+  addEventListener('resize',syncDock);
 
   function renderSelection() {
     const start = root.querySelector('[data-stretch-custom]');
@@ -115,6 +142,7 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
     guided.hidden = true;
     resume.hidden = !session || !!session.day.finished_at;
     if(!resume.hidden)resume.textContent='Продолжить · '+session.title;
+    syncDock();
   }
 
   function openCatalog() {
@@ -126,6 +154,7 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
   }
 
   function showStep() {
+    dock.querySelector('.stretch-step-actions')?.remove();
     active=!root.hidden;
     root.classList.add('stretch-in-session');
     home.hidden = true;
@@ -148,15 +177,16 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
       <progress class="stretch-progress" max="${steps.length}" value="${result.stretch.done}" aria-label="Выполнено шагов"></progress>
       <p class="flow-save-note">${day.local?'Шаг сохранён на этом устройстве. Для записи в дневник понадобится интернет.':'Шаг сохранён. Можно вернуться к занятию позже.'}</p>
       ${exerciseCard(exercise, false, getOpenTechnique(), step.side)}
-      <div class="stretch-step-actions">
+      <div class="stretch-actions-home"><div class="stretch-step-actions">
         ${exercise.seconds ? `<button class="button secondary" data-stretch-hold>${icon('clock')} Удержание ${exercise.seconds} с</button>` : ''}
         <button class="button primary" data-stretch-next>${label}</button>
-      </div>
+      </div></div>
       <div class="stretch-step-secondary">
         <button class="text-button" data-stretch-previous ${position === 0 ? 'disabled' : ''}>← Предыдущий шаг</button>
         <button class="text-button" data-stretch-skip>Пропустить движение</button>
       </div>${finish}`;
     }
+    syncDock();
     if(active){
       root.querySelector('#stretch-timer-slot').append(document.querySelector('#timer'));
       keepAwake(!!step&&!day.finished_at);
@@ -226,7 +256,7 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
     if (button.hasAttribute('data-stretch-resume')) showStep();
     if (!session || guided.hidden) return;
     if(button.hasAttribute('data-stretch-finish')){
-      saving=true;guided.querySelectorAll('button').forEach(button=>button.disabled=true);suspend();stopTimer();
+      saving=true;root.querySelectorAll('#stretch-guided button,#stretch-dock button').forEach(button=>button.disabled=true);suspend();stopTimer();
       const result=await hooks.finish?.(session.day);
       saving=false;
       if(result){session=null;timer=null;localStorage.removeItem(resumeKey);showHome();hooks.changed?.();}
@@ -247,7 +277,7 @@ export function initStretch(root, getOpenTechnique, hooks={}) {
     sync(days){
       const day=days.find(item=>item.id===session?.day?.id);
       if(!day||saving||session.day.local)return;
-      if(day.finished_at){if(active)showHome();session=null;timer=null;localStorage.removeItem(resumeKey);resume.hidden=true;return;}
+      if(day.finished_at){if(!root.hidden&&!guided.hidden)showHome();session=null;timer=null;localStorage.removeItem(resumeKey);resume.hidden=true;return;}
       if(day.stretch_revision!==(session.day.stretch_revision||0)){
         const wasActive=active;
         if(wasActive){suspend();stopTimer();}

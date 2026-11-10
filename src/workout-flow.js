@@ -1,5 +1,6 @@
-import {sessionResult,stretchProgress} from './session-progress.js';
+import {sessionResult,stretchProgress,stretchSteps} from './session-progress.js';
 import {byId} from './catalog.js';
+import {stretchById} from './stretch-catalog.js';
 import {anatomy, icon} from './icons.js';
 import {escape as esc, estimateLabel, estimateHint, firstPendingSet, formatDate, summary, todaySelection} from './state.js';
 
@@ -13,8 +14,18 @@ function todayAction(date, planId, label, finished = false) {
 }
 
 function progressBar(progress) {
-  return `<progress class="flow-progress" max="${Math.max(1, progress.total)}" value="${progress.done}" aria-label="Сохранённые подходы"></progress>`;
+  return `<progress class="flow-progress" max="${Math.max(1, progress.total)}" value="${progress.done}" aria-label="${progress.label||'Сохранённые подходы'}"></progress>`;
 }
+
+function stretchNext(session) {
+  if(!session?.items?.length||session.finished_at||firstPendingSet(session)||!session.stretch_ids?.length)return null;
+  const steps=stretchSteps(session.stretch_ids),position=session.stretch_state?.position||0,step=steps[position];
+  return {progress:{...stretchProgress(session),label:'Выполненные шаги растяжки'},
+    action:step?(position?'Продолжить растяжку':'К растяжке'):'К результату',
+    next:step?`Силовая часть готова · ${stretchById[step.id].title}${stretchById[step.id].unilateral?' · '+(step.side===1?'левая сторона':'правая сторона'):''}`:'Растяжка пройдена · осталось сохранить результат'};
+}
+
+const savedStretch=progress=>`Растяжка · выполнено шагов: ${progress.done} из ${progress.total}`;
 
 export function todayMarkup(data, date) {
   const {plan, session, previous} = todaySelection(data, date);
@@ -23,9 +34,10 @@ export function todayMarkup(data, date) {
   const title = session?.title || plan?.title;
   const stretchIds = (session||plan)?.stretch_ids||[];
   const pending = session && firstPendingSet(session);
+  const continuation=stretchNext(session);
   let main;
   if (items.length) {
-    const label = session?.finished_at ? (session.result_status==='partial'?'Частично выполнено':'Выполнено') : session ? 'В процессе' : 'По расписанию';
+    const label = session?.finished_at ? (session.result_status==='partial'?'Частично выполнено':'Выполнено') : continuation ? (continuation.action==='К результату'?'Осталось сохранить':'Осталась растяжка') : session ? 'В процессе' : 'По расписанию';
     const estimate = `По плану ${estimateLabel(session||plan)}`;
     const next = pending ? `${byId[pending.item.id].title} · подход ${pending.setIndex + 1} из ${pending.item.sets}${pending.side?' · '+(pending.side===1?'левая сторона':'правая сторона'):''}` : 'Все подходы отмечены';
     main = `<div class="today-card today-featured">
@@ -34,8 +46,8 @@ export function todayMarkup(data, date) {
       <h2>${esc(title)}</h2>
       <p class="flow-meta">${icon('clock')} ${estimate}<span aria-hidden="true">·</span>${progress.total} ${approachNouns[numberForm.select(progress.total)]}${stretchIds.length?' · растяжка после':''}</p>
       ${!session?.finished_at?`<small class="time-note">${estimateHint(session||plan)}</small>`:''}
-      ${session ? `<p class="today-next">${session.finished_at ? 'Сохранено в дневнике' : next}</p>${progressBar(progress)}<small>${savedApproaches(progress)}</small>` : ''}
-      <div class="flow-actions">${todayAction(date, session?.plan_id || plan.id, session?.finished_at ? 'Посмотреть занятие' : session ? 'Продолжить' : 'Начать тренировку', !!session?.finished_at)}</div>
+      ${session ? `<p class="today-next">${session.finished_at ? 'Сохранено в дневнике' : continuation?.next||next}</p>${progressBar(continuation?.progress||progress)}<small>${continuation?savedStretch(continuation.progress):savedApproaches(progress)+(session.finished_at&&stretchIds.length?' · '+savedStretch(stretchProgress(session)):'')}</small>` : ''}
+      <div class="flow-actions">${todayAction(date, session?.plan_id || plan.id, session?.finished_at ? 'Посмотреть занятие' : continuation?.action||(session ? 'Продолжить' : 'Начать тренировку'), !!session?.finished_at)}</div>
     </div>`;
   } else if(stretchIds.length){
     main = `<div class="today-card today-featured"><span class="eyebrow">${session?.finished_at?(session.result_status==='partial'?'Частично выполнено':'Выполнено'):session?'В процессе':'По расписанию'}</span>
@@ -52,10 +64,11 @@ export function todayMarkup(data, date) {
   if (!previous) return main;
   const saved = summary(previous);
   const previousStep = firstPendingSet(previous);
+  const previousStretch=stretchNext(previous);
   return `${main}<div class="today-card today-previous">
     <div><span class="eyebrow">Незавершённое занятие · ${formatDate(previous.workout_date)}</span><h3>${esc(previous.title)}</h3>
-      <p>${previous.items.length?(previousStep ? `${byId[previousStep.item.id].title} · подход ${previousStep.setIndex + 1} из ${previousStep.item.sets}` : 'Все подходы отмечены'):`Растяжка · движений в плане: ${previous.stretch_ids.length}`}</p>${previous.items.length?`<small>${savedApproaches(saved)}</small>`:''}</div>
-    ${previous.items.length?todayAction(previous.workout_date, previous.plan_id, 'Продолжить занятие'):`<button class="button primary flow-primary" data-day-start data-write data-workout-date="${previous.workout_date}" data-workout-plan="${esc(previous.plan_id)}">Продолжить растяжку</button>`}
+      <p>${previousStretch?.next||(previous.items.length?(previousStep ? `${byId[previousStep.item.id].title} · подход ${previousStep.setIndex + 1} из ${previousStep.item.sets}${previousStep.side?' · '+(previousStep.side===1?'левая сторона':'правая сторона'):''}` : 'Все подходы отмечены'):`Растяжка · движений в плане: ${previous.stretch_ids.length}`)}</p>${previous.items.length?`<small>${previousStretch?savedStretch(previousStretch.progress):savedApproaches(saved)}</small>`:''}</div>
+    ${previous.items.length?todayAction(previous.workout_date, previous.plan_id, previousStretch?.action||'Продолжить занятие'):`<button class="button primary flow-primary" data-day-start data-write data-workout-date="${previous.workout_date}" data-workout-plan="${esc(previous.plan_id)}">Продолжить растяжку</button>`}
   </div>`;
 }
 
@@ -71,7 +84,7 @@ export function guidedMarkup(session, renderExercise) {
   }
   if (!step) {
     return `<div class="today-card flow-finished">${icon('check')}<h2 id="guided-step" tabindex="-1">Все подходы выполнены</h2>
-      <p>${result.stretch.total?'Силовая часть готова. Теперь можно перейти к растяжке.':'Сохраните занятие, чтобы отметить день в календаре.'}</p>
+      <p>${result.stretch.total?'Подходы сохранены. Осталась растяжка из вашего плана.':'Сохраните занятие, чтобы отметить день в календаре.'}</p>
       <div class="flow-actions">${result.stretch.total?`<button class="button primary" data-workout-stretch>К растяжке ${icon('arrow')}</button>`:`<button class="button primary flow-primary" id="guided-finish" data-write>${icon('check')} Сохранить занятие</button>`}</div>${result.stretch.total?finishChoice(session):''}
     </div>`;
   }

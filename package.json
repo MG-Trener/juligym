@@ -16,6 +16,7 @@
     "test:mobile": "node scripts/check-mobile-runtime.cjs",
     "test:interface": "node scripts/check-interface.cjs",
     "test:desktop": "node scripts/check-desktop-flow.cjs",
+    "test:journey": "node scripts/check-journey.cjs",
     "test:pwa": "node scripts/check-pwa.cjs",
     "test:access": "node scripts/check-access.cjs",
     "test:session": "node scripts/check-first-package.cjs",
