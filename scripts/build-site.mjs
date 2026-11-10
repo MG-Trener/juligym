@@ -6,6 +6,7 @@ for(const e of JSON.parse(await fs.readFile('src/catalog.json','utf8')))inputs.p
 inputs.push('src/stretch.js','src/stretch-catalog.js','src/stretch.css',...stretches.map(exercise=>'media/'+exercise.id+'.webp'));
 inputs.push('src/session-progress.js','src/workout-flow.js','src/workout-flow.css','src/week-plan.js','src/day-settings.js','src/day-autosave.js');
 inputs.push('src/workout-time.js');
+inputs.push('src/interface-sound.js');
 const hash=crypto.createHash('sha256');for(const file of inputs)hash.update(file).update(await fs.readFile(file));
 const version=hash.digest('hex').slice(0,16);
 const worker=`const CACHE='juligym-access-'+${JSON.stringify(version)},FILES=${JSON.stringify(inputs)};

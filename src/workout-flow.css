@@ -147,6 +147,10 @@ body:has(dialog[open]) > #undo-remove { display:none; }
 .timer-head > button { min-width: 44px; min-height: 44px; }
 .timer-body > button { min-width: 44px; min-height: 44px; }
 .timer-body > button[data-timer-toggle] { width: auto; font-size: 14px; flex-shrink: 0; }
+.interface-sound-setting { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 12px; min-height: 44px; margin: 16px 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.interface-sound-setting input { width: 20px; height: 20px; accent-color: var(--accent); }
+.interface-sound-setting strong, .interface-sound-setting small { display: block; }
+.interface-sound-setting small { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .guided-actions { margin: 10px 0 16px; }
 .flow-finished > .icon { width: 34px; height: 34px; color: var(--accent); }
 @media (max-width: 1000px) {

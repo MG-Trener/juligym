@@ -6,6 +6,7 @@ let token;
 async function call(route,body,status=200){const response=await fetch(new URL(route,api),{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});const result=await response.json();assert.equal(response.status,status,JSON.stringify(result));return result;}
 async function login(page){await page.locator('#access-password').fill(password);await page.locator('#access-form [type=submit]').click();await page.locator('#access-dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
 function instrument(){
+ localStorage.setItem('juligym2:interface-sound','off'); // Test timer signals independently.
  window.qaVisibility='visible';Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>qaVisibility});
  window.setVisibility=value=>{window.qaVisibility=value;document.dispatchEvent(new Event('visibilitychange'));};
  window.wakeTest={requests:0,active:0,max:0,defer:false,deny:false,resolve:null};

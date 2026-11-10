@@ -5,11 +5,12 @@ async function enter(page){await page.locator('#access-password').fill(password)
 const base=process.env.SITE_URL||'http://127.0.0.1:4173/',profile=path.resolve('artifacts/pwa-profile-'+Date.now());
 (async()=>{let context=await chromium.launchPersistentContext(profile,{channel:'msedge',headless:true,viewport:{width:390,height:844}});
 try{
+ await context.addInitScript(()=>localStorage.setItem('juligym2:interface-sound','off'));
  if(process.env.API_URL)await context.route('**/config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.JULIGYM_CONFIG='+JSON.stringify({apiUrl:process.env.API_URL})}));
  let page=await context.newPage();await page.goto(base);await enter(page);await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
  await page.evaluate(()=>navigator.serviceWorker.ready);
  const cache=await page.evaluate(async()=>{const names=(await caches.keys()).filter(n=>n.startsWith('juligym-access-'));return (await(await caches.open(names[0])).keys()).length;});
- assert.equal(cache,145);
+ assert.equal(cache,146);
  const cdp=await context.newCDPSession(page);await cdp.send('Page.enable');const install=await cdp.send('Page.getInstallabilityErrors');assert.deepEqual(install.installabilityErrors,[]);
  assert.equal(await page.locator('#today-view').isVisible(),true);await page.locator('.mobile-nav [data-view=day]').click();
  await page.locator('#day-templates').click();
