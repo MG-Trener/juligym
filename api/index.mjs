@@ -6,6 +6,7 @@ import {passwordMatches,issueAccess,validAccess} from './access.mjs';
 import {separateSides,advanceStretch,sessionResult} from '../src/session-progress.js';
 import {stretchById} from '../src/stretch-catalog.js';
 import {doseValue} from '../src/day-settings.js';
+import {dayMove,dayRestore,checkDayVersion,removedExercise,editDayLayout} from './day-layout.mjs';
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:10000,idleTimeoutMillis:20000});
 attachDatabasePool(pool);pool.on('error',()=>console.error('Database pool error'));
 const allowed=new Set(['https://juligym.mg-trener.com','https://mg-trener.github.io','http://127.0.0.1:4173','http://localhost:4173']);
@@ -30,8 +31,10 @@ async function ensureSession(c,date,planId){
 async function changeDay(c,edit){
  const schedule=(await c.query('SELECT * FROM juli_schedule WHERE id=1 FOR UPDATE')).rows[0];
  const assigned=schedule.weekdays[edit.weekday];
- const base=assigned?(await c.query('SELECT * FROM juli_plans WHERE id=$1 FOR UPDATE',[assigned])).rows[0]:null;
- const next=edit.field?editDaySettings(base,edit):editDayItems(base,edit);
+ const baseId=assigned||(edit.kind==='restore'?edit.id:null);
+ const base=baseId?(await c.query('SELECT * FROM juli_plans WHERE id=$1 FOR UPDATE',[baseId])).rows[0]:null;
+ if(edit.kind)checkDayVersion(base,assigned,edit);
+ const next=edit.kind?editDayLayout(base,edit):edit.field?editDaySettings(base,edit):editDayItems(base,edit);
  if(!next)return {plan:base,schedule};
  const plan=(await c.query(`INSERT INTO juli_plans(id,title,subtitle,items,stretch_ids,stretch_settings) VALUES($1,$2,'Мой план недели',$3,$4,$5)
   ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title,items=EXCLUDED.items,stretch_ids=EXCLUDED.stretch_ids,stretch_settings=EXCLUDED.stretch_settings,revision=juli_plans.revision+1,updated_at=now() RETURNING *`,
@@ -39,9 +42,10 @@ async function changeDay(c,edit){
  const weekdays={...schedule.weekdays};
  if(next.items.length||next.stretchIds.length)weekdays[edit.weekday]=edit.id;
  else delete weekdays[edit.weekday];
- if(weekdays[edit.weekday]===assigned)return {plan,schedule};
+ const undo=!edit.kind&&!edit.field&&!edit.added?removedExercise(base,edit,plan):undefined;
+ if(weekdays[edit.weekday]===assigned)return {plan,schedule,undo};
  const changed=(await c.query('UPDATE juli_schedule SET weekdays=$1,revision=revision+1 WHERE id=1 RETURNING *',[JSON.stringify(weekdays)])).rows[0];
- return {plan,schedule:changed};
+ return {plan,schedule:changed,undo};
 }
 export default {async fetch(request){
  const url=new URL(request.url),origin=request.headers.get('origin');
@@ -80,8 +84,8 @@ export default {async fetch(request){
   if(route==='/schedule'){
    const plans=(await pool.query('SELECT id FROM juli_plans')).rows.map(r=>r.id),weekdays=scheduleValue(body.weekdays,plans);const r=await pool.query('UPDATE juli_schedule SET weekdays=$1,revision=revision+1 WHERE id=1 AND revision=$2 RETURNING *',[JSON.stringify(weekdays),body.revision]);if(!r.rowCount)throw new InputError('Расписание изменено в другом окне. Обновите данные.',409);return reply({schedule:r.rows[0]});
   }
-  if(route==='/day-exercise'||route==='/day-settings'){
-   const edit=route==='/day-settings'?daySettings(body):dayEdit(body);
+  if(['/day-exercise','/day-settings','/day-move','/day-restore'].includes(route)){
+   const edit=route==='/day-move'?dayMove(body):route==='/day-restore'?dayRestore(body):route==='/day-settings'?daySettings(body):dayEdit(body);
    return reply(await transaction(c=>changeDay(c,edit)));
   }
   const date=dateValue(body.date);const currentDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Qyzylorda'});if(date>currentDate)throw new InputError('Будущие дни доступны только для планирования.');if(!/^[a-zA-Z0-9-]{1,50}$/.test(body.planId||''))throw new InputError('Выберите комплекс.');

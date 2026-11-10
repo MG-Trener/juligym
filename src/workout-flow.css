@@ -35,6 +35,31 @@
 .day-summary h2::first-letter { text-transform: uppercase; }
 .day-summary p, .day-note { color: var(--muted); font-size: 13px; }
 .day-note { margin: 8px 0 0; }
+.day-template-heading { margin-top:18px; }
+.day-template-heading h3 { font-size:19px; }
+.day-template-heading .day-note { margin-top:5px; line-height:1.5; }
+.day-list h3 small { font-size:12px; font-weight:400; }
+.day-library-card > .day-order { padding:4px 7px; border-top:1px solid var(--line); gap:2px; }
+.day-order > span { color:var(--muted); font-size:12px; white-space:nowrap; }
+.day-order > div { display:flex; gap:2px; }
+.day-order .icon-button { width:44px; min-width:44px; height:44px; font-size:20px; }
+.day-order .icon-button:disabled { opacity:.3; }
+.undo-notice { position:fixed; right:20px; bottom:20px; z-index:100; display:flex; align-items:center; gap:10px; width:min(580px,calc(100vw - 40px)); padding:12px; border:1px solid #658331; border-radius:12px; background:#1d2819; box-shadow:0 8px 24px #0005; }
+.undo-notice[hidden] { display:none; }
+.undo-notice > span { flex:1; min-width:0; }
+.undo-notice strong { display:block; font-size:13px; overflow-wrap:anywhere; }
+.undo-notice small { display:block; color:var(--muted); margin-top:3px; font-size:11px; }
+.undo-notice .button { min-height:44px; padding-inline:10px; color:var(--accent); }
+.undo-notice .icon-button { flex:0 0 32px; min-height:44px; width:32px; }
+.undo-inline { position:static; width:100%; margin-bottom:10px; box-shadow:none; }
+body:has(dialog[open]) > #undo-remove { display:none; }
+.has-day-undo .main { padding-bottom:170px; }
+.has-day-undo .toast { bottom:170px; }
+@media(max-width:700px) {
+ #undo-remove { right:10px; width:calc(100vw - 20px); bottom:calc(76px + env(safe-area-inset-bottom)); gap:6px; padding:9px; }
+ .has-day-undo .main { padding-bottom:210px; }
+ .has-day-undo .toast { bottom:220px; }
+}
 .day-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
 .day-tools .button, .day-edit { min-height: 44px; }
 .day-tools .button { color: var(--accent); border-color: #587236; }

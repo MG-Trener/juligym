@@ -11,6 +11,7 @@
     "test:api": "node scripts/test-api.mjs",
     "test:browser": "node scripts/check-app.cjs",
     "test:day-settings": "node scripts/check-day-settings.cjs",
+    "test:week-template": "node scripts/check-week-template.cjs",
     "test:pwa": "node scripts/check-pwa.cjs",
     "test:access": "node scripts/check-access.cjs",
     "test:session": "node scripts/check-first-package.cjs",
