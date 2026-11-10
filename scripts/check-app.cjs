@@ -10,6 +10,7 @@ try{
  const p=await a.newPage(),q=await b.newPage();for(const page of [p,q])page.on('pageerror',e=>errors.push(e.message));
  await p.goto(base);await enter(p);await p.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
  const api=await p.evaluate(()=>window.JULIGYM_CONFIG.apiUrl);assert(api.includes('br-silent-lake-b99eu6ub'),'Browser write checks must use preview API');
+ await p.locator('#day-templates').click();
  await p.locator('#sidebar-create').click();const qaTitle='QA браузер '+Date.now();await p.locator('#plan-name').fill(qaTitle);
  await p.locator('[data-editor-add="legs01"]').click();await p.locator('[data-editor-add="core02"]').click();
  await p.locator('[data-editor-sets="legs01"]').selectOption('2');await p.locator('[data-editor-sets="core02"]').selectOption('1');
@@ -32,6 +33,7 @@ try{
  await p.locator('[data-mode=strength]').click();
  await p.waitForSelector('#guided-mark[data-guided-set="legs01:1"]');
  await q.goto(base);await enter(q);await q.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
+ await q.locator('.mobile-nav [data-view=today]').click();
  assert.equal(await q.locator('#today-view').isVisible(),true);
  await q.screenshot({path:'artifacts/today-mobile.png'});
  await q.locator(`#today-content [data-today-start][data-workout-plan="${planId}"]`).click();
@@ -44,6 +46,7 @@ try{
  await q.locator('#guided-mark').click();
  await q.waitForSelector('#guided-mark[data-guided-set="core02:0"]');
  await p.reload();await enter(p);await p.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
+ await p.locator('.workout-nav [data-view=today]').click();
  assert.equal(await p.locator('#today-view').isVisible(),true);
  await p.locator(`#today-content [data-today-start][data-workout-plan="${planId}"]`).click();
  await p.waitForSelector('#guided-mark[data-guided-set="core02:0"]');
@@ -57,7 +60,7 @@ try{
  await p.locator('[data-workout-stretch]').click();
  assert.equal(await p.locator('#stretch-cooldown').isVisible(),true);
  await q.reload();await enter(q);await q.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
- await q.locator('.mobile-nav [data-view=workout]').click();
+ await q.locator('#day-templates').click();
  await q.locator('#show-all-plans').click();await q.locator(`[data-plan="${planId}"]`).click();await q.waitForSelector('.session-saved');assert.equal(await q.locator('[data-set]:enabled').count(),0);assert(await q.locator('.week-day.completed').count()>0);
  await p.locator('[data-group=all]').click();
  assert.equal(await p.locator('#stretch-grid article').count(),30);
@@ -67,5 +70,54 @@ try{
  for(const [width,height]of [[320,740],[390,844],[768,1024],[844,390],[1440,1000],[1800,1000]]){await p.setViewportSize({width,height});await p.evaluate(()=>scrollTo(0,0));assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'overflow '+width);}
  await p.setViewportSize({width:1440,height:1000});await p.locator('[data-view=workout]').last().evaluate(n=>n.click());await p.locator('[data-plan=legs]').click();await p.screenshot({path:'artifacts/desktop-verified.png',fullPage:true});
  await q.locator('[data-view=library]').last().click();await q.locator('#menu-open').click();await q.screenshot({path:'artifacts/mobile-menu.png'});await q.locator('[data-group=legs]').click();await q.locator('#library-grid [data-image=legs01]').click();assert(await q.locator('#image-dialog').isVisible());await q.locator('#image-dialog [data-close]').click();await q.screenshot({path:'artifacts/mobile-verified.png',fullPage:false});
- assert.deepEqual(errors,[]);console.log('PASS: Today, first pending set on two devices and after reload, failed write stays on the same set, rest and hold timers, completion, stretching shortcut, editor, library, and mobile navigation.');
+ await q.locator('.mobile-nav [data-view=day]').click();
+ await q.locator('#week-days button').nth(6).click();
+ await q.locator('#day-intro [data-day-catalog=strength]').click();
+ await q.locator('#day-group').selectOption('back');
+ await q.locator('#day-library [data-image=back01]').click();
+ await q.locator('#image-day-action [data-day-edit=back01][data-day-added=true]').click();
+ await q.waitForSelector('#image-day-action [data-day-edit=back01][data-day-added=false]');
+ assert.equal(await q.locator('#editor-dialog').isVisible(),false);
+ await q.locator('#image-dialog [data-close]').click();
+ await q.locator('#day-catalog [data-day-catalog=stretch]').click();
+ await q.locator('#day-search').fill('сфинкс');
+ assert.equal(await q.locator('#day-library article').count(),1);
+ await q.locator('#day-library [data-day-edit=stretch-sphinx][data-day-added=true]').click();
+ await q.waitForSelector('#day-library [data-day-edit=stretch-sphinx][data-day-added=false]');
+ await q.locator('#day-catalog-close').click();
+ await q.waitForSelector('#day-lists [data-image=back01]');
+ await q.waitForSelector('#day-lists [data-image=stretch-sphinx]');
+ await q.screenshot({path:'artifacts/week-day-mobile.png'});
+ await q.reload();await enter(q);await q.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
+ await q.locator('#week-days button').nth(6).click();
+ await q.locator('#day-lists [data-day-edit=stretch-sphinx]').click();
+ await q.locator('#day-lists [data-day-edit=stretch-sphinx]').waitFor({state:'detached'});
+ await q.locator('#day-lists [data-day-edit=back01]').click();
+ await q.locator('#day-lists [data-day-edit=back01]').waitFor({state:'detached'});
+ assert.match(await q.locator('#day-intro').innerText(),/День свободен/);
+ await q.locator('#week-days button').first().click();
+ assert(await q.locator('#day-lists [data-image=legs01]').isVisible());
+ const thursday=q.locator('#week-days button').nth(3);
+ for(let attempt=0;attempt<6;attempt++){
+  const oldDate=await thursday.getAttribute('data-date');
+  await q.locator('[data-week="-1"]').click();
+  await q.waitForFunction(date=>document.querySelectorAll('#week-days button')[3]?.dataset.date!==date,oldDate);
+  if(!(await thursday.getAttribute('class')).includes('completed'))break;
+ }
+ assert(!(await thursday.getAttribute('class')).includes('completed'));
+ await thursday.click();
+ await q.locator('#day-intro [data-day-catalog=stretch]').click();
+ await q.locator('#day-search').fill('сфинкс');
+ await q.locator('#day-library [data-day-edit=stretch-sphinx][data-day-added=true]').click();
+ await q.waitForSelector('#day-library [data-day-edit=stretch-sphinx][data-day-added=false]');
+ await q.locator('#day-catalog-close').click();
+ const stretchStart=q.locator('#day-intro [data-day-start]');
+ await stretchStart.click();
+ await q.locator('[data-stretch-next]').click();
+ await q.locator('[data-day-stretch-finish]').click();
+ await q.waitForFunction(()=>document.querySelector('#day-intro').textContent.includes('Выполнено'));
+ assert(await q.locator('.week-day.selected.completed').isVisible());
+ await q.locator('#day-lists [data-day-edit=stretch-sphinx]').click();
+ await q.locator('#day-lists [data-day-edit=stretch-sphinx]').waitFor({state:'detached'});
+ assert.deepEqual(errors,[]);console.log('PASS: weekly mixed plan from illustrated cards, persistent plus/minus edits, stretch-only diary completion, Today, cross-device guided strength, timers, editor, library, and mobile navigation.');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

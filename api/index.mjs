@@ -1,7 +1,7 @@
 import pg from 'pg';
 import {attachDatabasePool} from '@neon/functions';
 import {randomUUID} from 'node:crypto';
-import {InputError,dateValue,planValue,scheduleValue,defaultPlans,progress} from './model.mjs';
+import {InputError,dateValue,planValue,scheduleValue,dayEdit,editDayItems,progress} from './model.mjs';
 import {passwordMatches,issueAccess,validAccess} from './access.mjs';
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:10000,idleTimeoutMillis:20000});
 attachDatabasePool(pool);pool.on('error',()=>console.error('Database pool error'));
@@ -17,9 +17,28 @@ async function readJson(request,max=24000){
 function serialize(row){return {...row,workout_date:typeof row.workout_date==='string'?row.workout_date:row.workout_date?.toISOString().slice(0,10)};}
 async function transaction(run){const c=await pool.connect();try{await c.query('BEGIN');const result=await run(c);await c.query('COMMIT');return result;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
 async function ensureSession(c,date,planId){
+ const existing=(await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2 FOR UPDATE',[date,planId])).rows[0];
+ if(existing)return existing;
  const plan=(await c.query('SELECT * FROM juli_plans WHERE id=$1',[planId])).rows[0];if(!plan)throw new InputError('Комплекс не найден.',404);
- await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items) VALUES($1,$2,$3,$4,$5) ON CONFLICT(workout_date,plan_id) DO NOTHING',[randomUUID(),date,planId,plan.title,JSON.stringify(plan.items)]);
+ if(!plan.items.length&&!plan.stretch_ids.length)throw new InputError('Сначала добавьте упражнения.');
+ await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items,stretch_ids) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(workout_date,plan_id) DO NOTHING',[randomUUID(),date,planId,plan.title,JSON.stringify(plan.items),JSON.stringify(plan.stretch_ids)]);
  return (await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2 FOR UPDATE',[date,planId])).rows[0];
+}
+async function changeDay(c,edit){
+ const schedule=(await c.query('SELECT * FROM juli_schedule WHERE id=1 FOR UPDATE')).rows[0];
+ const assigned=schedule.weekdays[edit.weekday];
+ const base=assigned?(await c.query('SELECT * FROM juli_plans WHERE id=$1 FOR UPDATE',[assigned])).rows[0]:null;
+ const next=editDayItems(base,edit);
+ if(!next)return {plan:base,schedule};
+ const plan=(await c.query(`INSERT INTO juli_plans(id,title,subtitle,items,stretch_ids) VALUES($1,$2,'Мой план недели',$3,$4)
+  ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title,items=EXCLUDED.items,stretch_ids=EXCLUDED.stretch_ids,revision=juli_plans.revision+1,updated_at=now() RETURNING *`,
+ [edit.id,base?.title||edit.title,JSON.stringify(next.items),JSON.stringify(next.stretchIds)])).rows[0];
+ const weekdays={...schedule.weekdays};
+ if(next.items.length||next.stretchIds.length)weekdays[edit.weekday]=edit.id;
+ else delete weekdays[edit.weekday];
+ if(weekdays[edit.weekday]===assigned)return {plan,schedule};
+ const changed=(await c.query('UPDATE juli_schedule SET weekdays=$1,revision=revision+1 WHERE id=1 RETURNING *',[JSON.stringify(weekdays)])).rows[0];
+ return {plan,schedule:changed};
 }
 export default {async fetch(request){
  const url=new URL(request.url),origin=request.headers.get('origin');
@@ -52,11 +71,15 @@ export default {async fetch(request){
   if(route==='/plans'){
    const value=planValue(body),id=body.id || randomUUID();if(typeof id!=='string'||!/^[a-zA-Z0-9-]{1,50}$/.test(id))throw new InputError('Некорректный комплекс.');
    if(body.id){const r=await pool.query('UPDATE juli_plans SET title=$1,subtitle=$2,items=$3,revision=revision+1,updated_at=now() WHERE id=$4 AND revision=$5 RETURNING *',[value.title,value.subtitle,JSON.stringify(value.items),id,body.revision]);if(!r.rowCount)throw new InputError('Комплекс уже изменён в другом окне. Обновите данные.',409);return reply({plan:r.rows[0]});}
-   const count=Number((await pool.query('SELECT count(*) FROM juli_plans')).rows[0].count);if(count>=30)throw new InputError('В дневнике уже 30 подборок. Отредактируйте существующую.');
+   const count=Number((await pool.query("SELECT count(*) FROM juli_plans WHERE id !~ '^weekday-[0-6]$'")).rows[0].count);if(count>=30)throw new InputError('В дневнике уже 30 подборок. Отредактируйте существующую.');
    const r=await pool.query('INSERT INTO juli_plans(id,title,subtitle,items) VALUES($1,$2,$3,$4) RETURNING *',[id,value.title,value.subtitle,JSON.stringify(value.items)]);return reply({plan:r.rows[0]},201);
   }
   if(route==='/schedule'){
    const plans=(await pool.query('SELECT id FROM juli_plans')).rows.map(r=>r.id),weekdays=scheduleValue(body.weekdays,plans);const r=await pool.query('UPDATE juli_schedule SET weekdays=$1,revision=revision+1 WHERE id=1 AND revision=$2 RETURNING *',[JSON.stringify(weekdays),body.revision]);if(!r.rowCount)throw new InputError('Расписание изменено в другом окне. Обновите данные.',409);return reply({schedule:r.rows[0]});
+  }
+  if(route==='/day-exercise'){
+   const edit=dayEdit(body);
+   return reply(await transaction(c=>changeDay(c,edit)));
   }
   const date=dateValue(body.date);const currentDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Qyzylorda'});if(date>currentDate)throw new InputError('Будущие дни доступны только для планирования.');if(!/^[a-zA-Z0-9-]{1,50}$/.test(body.planId||''))throw new InputError('Выберите комплекс.');
   const result=await transaction(async c=>{
@@ -69,7 +92,7 @@ export default {async fetch(request){
     if(inserted.rowCount){const key=`${item.id}:${body.setIndex}`;session.marks={...session.marks,[key]:body.done};return (await c.query('UPDATE juli_sessions SET marks=$1 WHERE id=$2 RETURNING *',[JSON.stringify(session.marks),session.id])).rows[0];}return session;
    }
    if(route==='/finish'){
-    if(session.finished_at)return session;const p=progress(session);if(!p.total||p.done!==p.total)throw new InputError('Сначала отметьте все подходы.');
+    if(session.finished_at)return session;const p=progress(session);if(p.done!==p.total||(!p.total&&!session.stretch_ids.length))throw new InputError('Сначала отметьте все подходы.');
     return (await c.query('UPDATE juli_sessions SET finished_at=now(),duration_seconds=LEAST(28800,GREATEST(0,EXTRACT(EPOCH FROM (now()-started_at))::integer)) WHERE id=$1 RETURNING *',[session.id])).rows[0];
    }
    throw new InputError('Неизвестный адрес.',404);

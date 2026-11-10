@@ -16,7 +16,7 @@
   <a id="brand" class="brand" href="./" aria-label="Моя домашняя тренировка"></a>
   <nav class="workout-nav" aria-label="Силовые тренировки">
    <button class="button secondary" data-view="today">Сегодня</button>
-   <button class="button secondary" data-view="workout">План недели</button>
+   <button class="button secondary" data-view="day">Неделя</button>
   </nav>
   <button class="button secondary stretch-nav" data-view="stretch">↔ Растяжка</button>
   <p class="sidebar-caption" id="sidebar-caption">СИЛОВАЯ БИБЛИОТЕКА</p>
@@ -38,11 +38,26 @@
    </div>
    <div class="header-actions"><span id="busy-indicator" hidden>Сохраняем…</span><button class="button quiet" data-view="history">История</button><button id="settings-open" class="profile-button" aria-label="Настройки дневника"><span class="profile-avatar">Ю</span><span><strong>Юля</strong><small>Общий дневник</small></span><b>⌄</b></button></div>
   </header>
-  <section class="week-section" aria-labelledby="week-title"><div class="heading-row"><div><h1 id="week-title">Ваш ритм недели</h1><p id="week-stat" class="muted">7 дней · ваш темп</p></div><button id="schedule-open" class="button quiet">Настроить дни ↗</button></div><div class="week-toolbar"><button class="icon-button" data-week="-1" aria-label="Предыдущая неделя">‹</button><span id="week-range"></span><button class="icon-button" data-week="1" aria-label="Следующая неделя">›</button><button id="current-week" class="text-button">Текущая неделя</button></div><div id="week-days" class="week-days"></div></section>
-  <section data-view-panel="today" id="today-view" aria-labelledby="today-title">
+  <section class="week-section" aria-labelledby="week-title"><div class="heading-row"><div><h1 id="week-title">План недели</h1><p id="week-stat" class="muted">7 дней · ваш темп</p></div><button id="schedule-open" class="button quiet" data-write>Настроить дни ↗</button></div><div class="week-toolbar"><button class="icon-button" data-week="-1" aria-label="Предыдущая неделя">‹</button><span id="week-range"></span><button class="icon-button" data-week="1" aria-label="Следующая неделя">›</button><button id="current-week" class="text-button">Текущая неделя</button></div><div id="week-days" class="week-days"></div></section>
+  <section data-view-panel="day" id="day-view" aria-labelledby="day-title">
+   <p id="day-offline" class="flow-offline" hidden>План доступен для просмотра. Для изменений и записи занятия нужен интернет.</p>
+   <div id="day-intro"></div>
+   <section id="day-catalog" class="day-catalog" aria-labelledby="day-catalog-title" hidden>
+    <div class="section-heading"><div><span id="day-catalog-date" class="eyebrow"></span><h3 id="day-catalog-title" tabindex="-1">Библиотека упражнений</h3></div><button class="button quiet" id="day-catalog-close">К плану дня ↑</button></div>
+    <div class="day-catalog-filters">
+     <div class="day-catalog-modes" role="group" aria-label="Вид упражнений"><button class="button quiet" data-day-catalog="strength" aria-pressed="true">Силовые</button><button class="button quiet" data-day-catalog="stretch" aria-pressed="false">Растяжка</button></div>
+     <input type="search" id="day-search" placeholder="Поиск упражнений…" aria-label="Поиск в каталоге" autocomplete="off">
+     <select id="day-group" aria-label="Группа мышц"></select>
+    </div>
+    <div id="day-library" class="day-library"></div>
+   </section>
+   <div id="day-lists"></div>
+   <div class="day-advanced"><button class="text-button" data-view="workout" id="day-templates">Готовые силовые комплексы →</button><button class="text-button" id="day-stretch-routines">Комплексы растяжки →</button></div>
+  </section>
+  <section data-view-panel="today" id="today-view" aria-labelledby="today-title" hidden>
    <div class="today-heading">
     <div><span class="eyebrow" id="today-date"></span><h1 id="today-title">Сегодня</h1></div>
-    <button class="button quiet" data-view="workout">План недели ↗</button>
+    <button class="button quiet" data-view="day">План недели ↗</button>
    </div>
    <p id="today-offline" class="flow-offline" hidden>Для начала занятия и записи подходов нужен интернет.</p>
    <div id="today-content"></div>
@@ -62,12 +77,12 @@
    <section aria-labelledby="exercise-heading"><div class="section-heading"><h2 id="exercise-heading">Упражнения</h2><details class="warmup"><summary>☀ Разминка · 5 мин</summary><p>2 минуты спокойного шага. Затем по минуте: движения плечами и локтями, неглубокие приседания с опорой, наклоны от таза и подъёмы на носки. Начинайте без гантелей.</p></details></div><div id="exercises" class="exercise-grid"></div><div id="session-actions" class="session-actions"></div></section>
    <button id="stretch-after" class="button secondary" hidden>Растяжка после тренировки →</button>
   </section>
-  <section data-view-panel="library" id="library-view" hidden><div class="section-heading"><div><span class="eyebrow">БИБЛИОТЕКА ДВИЖЕНИЙ</span><h1 id="library-title">Все группы мышц</h1></div><span id="library-count" class="count-badge"></span></div><p class="library-intro">Выберите движение и добавьте его в новую подборку. Для сложных вариантов сначала освойте базу.</p><div id="library-grid" class="exercise-grid library-grid"></div></section>
+  <section data-view-panel="library" id="library-view" hidden><div class="section-heading"><div><span class="eyebrow">БИБЛИОТЕКА ДВИЖЕНИЙ</span><h1 id="library-title">Все группы мышц</h1></div><span id="library-count" class="count-badge"></span></div><p class="library-intro" id="library-day"></p><div id="library-grid" class="exercise-grid library-grid"></div></section>
   <section data-view-panel="history" id="history-view" hidden><div class="section-heading"><div><span class="eyebrow">ОБЩИЙ ДНЕВНИК</span><h1>История занятий</h1></div><span class="count-badge"><b id="history-total">0</b> завершено</span></div><p class="library-intro">Завершённые тренировки Юли. Нажмите на занятие, чтобы посмотреть упражнения и подходы.</p><div id="history-list" class="history-list"></div></section>
   <section data-view-panel="stretch" id="stretch-view" aria-labelledby="stretch-title" hidden>
    <div class="stretch-heading">
     <div><span class="eyebrow">ДОМАШНИЕ ЗАНЯТИЯ</span><h1 id="stretch-title">Растяжка</h1><p>Гибкость и подвижность в комфортном темпе.</p></div>
-    <button class="button quiet" data-view="workout">← К тренировке</button>
+    <button class="button quiet" data-view="day">← К неделе</button>
    </div>
    <div id="stretch-home">
     <div class="stretch-note"><strong>Начните после тренировки или лёгкой разминки.</strong><p>Дышите свободно и тянитесь до лёгкого натяжения, без пружинящих движений. Если появляется боль, выйдите из положения.</p><p><a href="https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/stretching/art-20546848" target="_blank" rel="noreferrer">Как растягиваться · Mayo Clinic ↗</a> · <a href="https://www.nhs.uk/live-well/exercise/how-to-stretch-after-exercising/" target="_blank" rel="noreferrer">Растяжка после занятия · NHS ↗</a></p></div>
@@ -83,11 +98,11 @@
   </section>
   <footer class="footer"><span>Моя домашняя тренировка © <span id="year"></span></span><span>В своём темпе. Шаг за шагом.</span><button class="text-button" onclick="document.querySelector('#about-dialog').showModal()">О программе</button></footer>
  </main>
- <nav class="mobile-nav" aria-label="Основная навигация"><button data-view="today">◉<span>Сегодня</span></button><button data-view="workout">▦<span>План</span></button><button data-view="stretch">↔<span>Растяжка</span></button><button data-view="library">☷<span>Библиотека</span></button><button data-view="history">↗<span>История</span></button></nav>
+ <nav class="mobile-nav" aria-label="Основная навигация"><button data-view="today">◉<span>Сегодня</span></button><button data-view="day">▦<span>Неделя</span></button><button data-view="stretch">↔<span>Растяжка</span></button><button data-view="library">☷<span>Библиотека</span></button><button data-view="history">↗<span>История</span></button></nav>
  <aside id="timer" class="timer" aria-label="Таймер отдыха" hidden></aside><div id="toast" class="toast" role="status" hidden></div>
  <dialog id="editor-dialog" class="editor-dialog"><div class="dialog-heading"><div><span class="eyebrow">КОНСТРУКТОР ТРЕНИРОВКИ</span><h2 id="editor-title">Новая подборка</h2></div><button class="icon-button" data-close aria-label="Закрыть редактор">×</button></div><form id="plan-form"><label class="field">Название<input id="plan-name" required minlength="2" maxlength="70" placeholder="Например, спокойная тренировка"></label><div class="section-heading"><h3>Упражнения по порядку</h3><span id="editor-counter" class="muted"></span></div><div id="editor-selected" class="editor-selected"></div><label class="field">Добавить движение<input id="editor-search" type="search" placeholder="Название или мышца"></label><div id="editor-options" class="editor-options"></div><div class="editor-save"><p>Изменения подборки доступны всем посетителям. Уже начатые занятия сохранят прежний состав.</p><button class="button primary" type="submit" data-write>Сохранить подборку</button></div></form></dialog>
  <dialog id="schedule-dialog"><div class="dialog-heading"><div><span class="eyebrow">ПОВТОРЯЕТСЯ КАЖДУЮ НЕДЕЛЮ</span><h2>Ваш ритм недели</h2></div><button class="icon-button" data-close aria-label="Закрыть расписание">×</button></div><form id="schedule-form"><p class="dialog-note">Назначьте комплексы на удобные дни. Между нагрузкой на одну группу мышц оставляйте день отдыха.</p><div id="schedule-days" class="schedule-days"></div><button class="button primary" type="submit" data-write>Сохранить расписание</button></form></dialog>
- <dialog id="image-dialog" class="image-dialog"><div class="dialog-heading"><h2 id="image-title"></h2><button class="icon-button" data-close aria-label="Закрыть изображение">×</button></div><img id="image-large" alt=""><ol id="image-steps"></ol><p id="image-cue" class="image-cue"></p><small>Подсветка мышц схематична. Иллюстрация дополняет текстовые подсказки по технике.</small></dialog>
+ <dialog id="image-dialog" class="image-dialog"><div class="dialog-heading"><h2 id="image-title"></h2><button class="icon-button" data-close aria-label="Закрыть изображение">×</button></div><div id="image-day-action" class="image-day-action" hidden></div><img id="image-large" alt=""><ol id="image-steps"></ol><p id="image-cue" class="image-cue"></p><small>Подсветка мышц схематична. Иллюстрация дополняет текстовые подсказки по технике.</small></dialog>
  <dialog id="settings-dialog"><div class="dialog-heading"><h2>Настройки дневника</h2><button class="icon-button" data-close aria-label="Закрыть настройки">×</button></div><p class="dialog-note">Это один общий дневник Юли. Доступ по общему паролю: после входа можно добавить отметку, создать подборку и изменить расписание.</p><button id="lock-access" class="button secondary">Заблокировать дневник</button><button id="refresh-data" class="button secondary">Обновить данные из Neon</button><button id="install-app" class="button secondary">Установить приложение</button><button id="update-app" class="button primary" hidden>Обновить приложение</button><p id="offline-status" class="dialog-note" role="status">Готовим копию сайта…</p><p class="dialog-note">Без сети доступен последний загруженный дневник. Для сохранения общих отметок нужен интернет. Звук таймера переключается прямо в его панели.</p></dialog>
  <dialog id="install-dialog"><div class="dialog-heading"><h2>Запуск как приложение</h2><button class="icon-button" data-close aria-label="Закрыть инструкцию">×</button></div><p>В Chrome или Edge откройте меню браузера и выберите «Установить приложение». На iPhone: Safari → «Поделиться» → «На экран Домой».</p><p class="dialog-note">После установки запускайте тренировку с иконки. Для сохранения занятий в общем дневнике нужен интернет.</p></dialog>
  <dialog id="about-dialog"><div class="dialog-heading"><h2>Дома. Для себя.</h2><button class="icon-button" data-close aria-label="Закрыть сведения">×</button></div><p>87 домашних движений со своим весом, гантелями и простыми опорами. Начните с 1–2 подходов и посильной амплитуды. В библиотеке есть более сложные варианты — они отмечены отдельно.</p><p>Выдох на усилии, возвращение плавное. При острой боли, головокружении или необычной одышке остановитесь. При известных ограничениях согласуйте занятия со специалистом.</p><p>Движения с незакреплённой гантелью на стопе и между стопами заменены вариантами без веса; шаги выполняются на низкую устойчивую ступень. Тяга гантелей к лицу заменена W-подъёмом.</p><p>Иллюстрации созданы с помощью ИИ. Подсветка мышц условная; текст уточняет технику. Калории и другие неизмеренные показатели не рассчитываются.</p><a href="https://www.acefitness.org/resources/everyone/exercise-library/" target="_blank" rel="noreferrer">ACE · Библиотека упражнений ↗</a><p class="dialog-note">Общий дневник хранится в Neon. Вход по общему паролю; все вошедшие видят одни и те же записи.</p></dialog>

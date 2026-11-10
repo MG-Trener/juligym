@@ -10,7 +10,7 @@ async function enter(page){await page.locator('#access-password').fill(password)
  await page.locator('#access-password').fill(password.toLowerCase());await page.locator('#access-form [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#access-error').textContent.includes('Неверный'));assert.equal(await page.locator('#main').isVisible(),false);assert.equal(stateCalls,0);
  await enter(page);assert.equal(await page.locator('#main').isVisible(),true);
  const checks=await page.evaluate(async()=>{const api=window.JULIGYM_CONFIG.apiUrl;const url=new URL('state?from=2026-10-26&to=2026-11-01',api);const state=await fetch(url),write=await fetch(new URL('start',api),{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});return {read:state.status,write:write.status,stored:JSON.stringify({...localStorage})};});assert.equal(checks.read,401);assert.equal(checks.write,401);assert(!checks.stored.includes('Bearer '));assert(!checks.stored.includes(JSON.stringify(password)));
- await page.locator('.workout-nav [data-view=workout]').click();
+ await page.locator('#day-templates').click();
  await page.locator('#exercises .technique summary').nth(0).click();await page.locator('#exercises .technique[open]').waitFor();
  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForTimeout(600);assert.equal(await page.locator('#exercises .technique[open]').count(),1);assert.equal(await page.locator('#exercises .technique').nth(0).getAttribute('open'),'');
  await page.locator('#exercises .technique summary').nth(1).click();assert.equal(await page.locator('.technique[open]').count(),1);assert.equal(await page.locator('#exercises .technique').nth(0).getAttribute('open'),null);

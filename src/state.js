@@ -18,6 +18,19 @@ export function firstPendingSet(session) {
   return null;
 }
 
+export function plannedWorkout(data,date) {
+ const id=data.schedule?.weekdays?.[dayIndex(date)];
+ return data.plans.find(plan=>plan.id===id);
+}
+
+export function sessionForDate(data,date) {
+ const sessions=data.sessions.filter(session=>session.workout_date===date);
+ const scheduledId=plannedWorkout(data,date)?.id;
+ return sessions.find(session=>!session.finished_at&&session.plan_id===scheduledId)||
+   sessions.find(session=>!session.finished_at)||
+   sessions.find(session=>session.plan_id===scheduledId)||sessions[0];
+}
+
 export function todaySelection(data, date) {
   const scheduledId = data.schedule?.weekdays?.[dayIndex(date)];
   const recent = data.sessions.filter(session => session.workout_date >= addDays(date, -7) && session.workout_date <= date);

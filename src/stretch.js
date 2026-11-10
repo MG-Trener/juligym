@@ -105,10 +105,10 @@ export function initStretch(root, getOpenTechnique) {
     root.classList.add('stretch-in-session');
     home.hidden = true;
     guided.hidden = false;
-    const {title, steps, position} = session;
+    const {title, steps, position, day} = session;
     const step = steps[position];
     if (!step) {
-      guided.innerHTML = `<div class="stretch-complete">${icon('check')}<h2 tabindex="-1">Комплекс завершён</h2><p>${title}</p><button class="button primary" data-stretch-home>К комплексам</button></div>`;
+      guided.innerHTML = `<div class="stretch-complete">${icon('check')}<h2 tabindex="-1">Комплекс завершён</h2><p>${title}</p>${day ? `<button class="button primary" data-day-stretch-finish data-write data-workout-date="${day.workout_date}" data-workout-plan="${day.plan_id}">Сохранить в дневник</button>` : '<button class="button primary" data-stretch-home>К комплексам</button>'}</div>`;
     } else {
       const exercise = stretchById[step.id];
       const side = exercise.unilateral ? ` · сторона ${step.side} из 2` : '';
@@ -139,13 +139,14 @@ export function initStretch(root, getOpenTechnique) {
     showStep();
   }
 
-  function start(title, ids) {
+  function start(title, ids, day) {
     if (!ids.length) return;
+    if(day && session?.day?.id===day.id){showStep();return;}
     const steps = ids.flatMap((id, exerciseIndex) => {
       const first = {id, exerciseIndex, side: 1};
       return stretchById[id].unilateral ? [first, {...first, side: 2}] : [first];
     });
-    session = {title, steps, exerciseCount: ids.length, position: 0};
+    session = {title, steps, exerciseCount: ids.length, position: 0, day};
     goToStep(0);
   }
 
@@ -204,6 +205,7 @@ export function initStretch(root, getOpenTechnique) {
   });
 
   return {
+    start,
     get filters() { return {group, query}; },
     filterCatalog({group: nextGroup = group, query: nextQuery = query}) {
       group = nextGroup;

@@ -20,6 +20,7 @@ async function login(page) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
     await login(page);
+    await page.locator('.mobile-nav [data-view=today]').click();
     const nav = page.locator('.mobile-nav [data-view=stretch]');
     const strengthMode = page.locator('[data-mode=strength]');
     const stretchMode = page.locator('[data-mode=stretch]');
@@ -71,6 +72,7 @@ async function login(page) {
     await page.locator('[data-stretch-add=stretch-ankle-circles]').click();
     await page.reload();
     await login(page);
+    await page.locator('.mobile-nav [data-view=today]').click();
     await nav.click();
     assert.equal(await page.locator('#stretch-selection button').count(), 2);
     await page.locator('[data-stretch-custom]').click();
@@ -106,7 +108,8 @@ async function login(page) {
     assert.match(await guided.locator('h2').innerText(), /Движение 2 из 2 · сторона 2 из 2/);
     await page.locator('[data-stretch-next]').click();
     assert.equal(await guided.locator('h2').innerText(), 'Комплекс завершён');
-    await page.locator('.mobile-nav [data-view=workout]').click();
+    await page.locator('.mobile-nav [data-view=day]').click();
+    await page.locator('#day-templates').click();
     assert.equal(await page.locator('.week-section').isVisible(), true);
     await page.locator('#stretch-after').click();
     assert.equal(await page.locator('#stretch-cooldown').isVisible(), true);

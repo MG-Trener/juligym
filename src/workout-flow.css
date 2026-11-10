@@ -21,6 +21,45 @@
 }
 .mode-switch button:hover { color: var(--ink); background: #ffffff0a; }
 .mode-switch button[aria-pressed="true"] { color: #172706; background: var(--accent); }
+.day-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 17px 20px;
+  border: 1px solid #52673a;
+  border-radius: 13px;
+  background: linear-gradient(140deg, #202a1e, #151a1c 75%);
+}
+.day-summary h2 { margin: 3px 0; font-size: clamp(21px, 4vw, 29px); }
+.day-summary h2::first-letter { text-transform: uppercase; }
+.day-summary p, .day-note { color: var(--muted); font-size: 13px; }
+.day-note { margin: 8px 0 0; }
+.day-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+.day-tools .button, .day-edit { min-height: 44px; }
+.day-tools .button { color: var(--accent); border-color: #587236; }
+.day-list { margin: 18px 0; }
+.day-list > h3 { margin-bottom: 10px; }
+.day-list > .section-heading { margin-bottom: 10px; }
+#library-grid .day-edit { align-self: start; margin: 10px 14px; }
+.day-catalog { margin-bottom: 22px; scroll-margin-top: 12px; }
+.day-catalog .section-heading { margin-top: 0; }
+.day-catalog-filters, .day-catalog-modes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.day-catalog-filters { margin: 10px 0; }
+.day-catalog-modes [aria-pressed="true"] { color: var(--accent); border-color: #769434; background: #b8f23816; }
+.day-catalog-filters input { min-width: 0; flex: 1 1 160px; }
+.day-catalog-filters input, .day-catalog-filters select { min-height: 44px; max-width: 100%; }
+.day-library { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; }
+.day-library-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: #151a1c; }
+.day-library-card .exercise-art { display: block; width: 100%; margin: 0; border-radius: 0; }
+.day-library-card .exercise-art > img { aspect-ratio: 1.5; }
+.day-library-card > div { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 7px; }
+.day-library-card h3 { font-size: 13px; overflow-wrap: anywhere; }
+.day-library-card p { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.day-edit-compact { flex: 0 0 44px; width: 44px; padding: 0; font-size: 24px; color: var(--accent); }
+.day-edit-compact[data-day-added="false"] { border-color: #6e8d43; background: #263422; }
+.day-advanced { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 12px; }
+.image-day-action { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; color: var(--muted); }
 #today-view, #guided-view { max-width: 790px; }
 .today-heading, .guided-heading, .guided-position {
   display: flex;
@@ -74,6 +113,11 @@
 @media (max-width: 700px) {
   .app-header { flex-wrap: wrap; }
   .app-header > .mode-switch { order: 1; }
+  .day-summary { flex-wrap: wrap; padding: 13px; }
+  .day-summary .flow-primary { width: 100%; }
+  .day-tools .button { flex: 1 1 auto; padding-inline: 8px; font-size: 13px; }
+  .day-library { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .day-catalog-filters input { font-size: 16px; }
   .today-card { padding: 16px; }
   .today-heading > .button, .guided-heading > .button { padding-inline: 8px; font-size: 12px; }
   .today-previous { align-items: stretch; flex-direction: column; gap: 10px; }

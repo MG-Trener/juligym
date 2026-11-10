@@ -16,3 +16,5 @@ CREATE INDEX IF NOT EXISTS juli_sessions_date_idx ON juli_sessions(workout_date 
 CREATE TABLE IF NOT EXISTS juli_operations (
  id uuid PRIMARY KEY, session_id uuid NOT NULL REFERENCES juli_sessions(id), created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE juli_plans ADD COLUMN IF NOT EXISTS stretch_ids jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS stretch_ids jsonb NOT NULL DEFAULT '[]';

@@ -20,6 +20,7 @@ export function todayMarkup(data, date) {
   const items = session?.items || plan?.items || [];
   const progress = summary({items, marks: session?.marks});
   const title = session?.title || plan?.title;
+  const stretchIds = (session||plan)?.stretch_ids||[];
   const pending = session && firstPendingSet(session);
   let main;
   if (items.length) {
@@ -30,10 +31,14 @@ export function todayMarkup(data, date) {
       ${anatomy(byId[items[0].id]?.group, 'today-anatomy')}
       <span class="eyebrow">${label}</span>
       <h2>${esc(title)}</h2>
-      <p class="flow-meta">${icon('clock')} ${estimate}<span aria-hidden="true">·</span>${progress.total} ${approachNouns[numberForm.select(progress.total)]}</p>
+      <p class="flow-meta">${icon('clock')} ${estimate}<span aria-hidden="true">·</span>${progress.total} ${approachNouns[numberForm.select(progress.total)]}${stretchIds.length?' · растяжка после':''}</p>
       ${session ? `<p class="today-next">${session.finished_at ? 'Сохранено в дневнике' : next}</p>${progressBar(progress)}<small>${savedApproaches(progress)}</small>` : ''}
       <div class="flow-actions">${todayAction(date, session?.plan_id || plan.id, session?.finished_at ? 'Посмотреть занятие' : session ? 'Продолжить' : 'Начать тренировку', !!session?.finished_at)}</div>
     </div>`;
+  } else if(stretchIds.length){
+    main = `<div class="today-card today-featured"><span class="eyebrow">${session?.finished_at?'Выполнено':session?'В процессе':'По расписанию'}</span>
+      <h2>Растяжка · ${esc(title)}</h2><p>Движений в плане: ${stretchIds.length}</p>
+      <div class="flow-actions"><button class="button primary flow-primary" data-day-start ${session?.finished_at?'':'data-write'} data-workout-date="${date}" data-workout-plan="${esc(session?.plan_id||plan.id)}">${icon('play')} ${session?.finished_at?'Открыть растяжку':session?'Продолжить':'Начать растяжку'}</button></div></div>`;
   } else {
     main = `<div class="today-card">
       <h2>${data.plans.length ? 'День отдыха' : 'Расписание тренировок'}</h2>
@@ -46,8 +51,8 @@ export function todayMarkup(data, date) {
   const previousStep = firstPendingSet(previous);
   return `${main}<div class="today-card today-previous">
     <div><span class="eyebrow">Незавершённое занятие · ${formatDate(previous.workout_date)}</span><h3>${esc(previous.title)}</h3>
-      <p>${previousStep ? `${byId[previousStep.item.id].title} · подход ${previousStep.setIndex + 1} из ${previousStep.item.sets}` : 'Все подходы отмечены'}</p><small>${savedApproaches(saved)}</small></div>
-    ${todayAction(previous.workout_date, previous.plan_id, 'Продолжить занятие')}
+      <p>${previous.items.length?(previousStep ? `${byId[previousStep.item.id].title} · подход ${previousStep.setIndex + 1} из ${previousStep.item.sets}` : 'Все подходы отмечены'):`Растяжка · движений в плане: ${previous.stretch_ids.length}`}</p>${previous.items.length?`<small>${savedApproaches(saved)}</small>`:''}</div>
+    ${previous.items.length?todayAction(previous.workout_date, previous.plan_id, 'Продолжить занятие'):`<button class="button primary flow-primary" data-day-start data-write data-workout-date="${previous.workout_date}" data-workout-plan="${esc(previous.plan_id)}">Продолжить растяжку</button>`}
   </div>`;
 }
 

@@ -1,22 +1,26 @@
 import {exercises,groups,byId} from './catalog.js';
 import {icon,anatomy} from './icons.js';
-import {today,addDays,weekStart,dayIndex,summary,estimatedMinutes,formatDate,firstPendingSet,escape as esc} from './state.js';
+import {today,addDays,weekStart,dayIndex,summary,estimatedMinutes,formatDate,firstPendingSet,plannedWorkout,sessionForDate,escape as esc} from './state.js';
 import {request} from './api.js';
 import {isUnlocked,lockAccess} from './access.js';
 import {startTimer,stopTimer,keepAwake} from './timer.js';
 import {initStretch} from './stretch.js';
 import {stretches,stretchById} from './stretch-catalog.js';
 import {todayMarkup,guidedMarkup} from './workout-flow.js';
+import {dayMarkup,dayEditButton,catalogMarkup,catalogGroupOptions} from './week-plan.js';
 const $=s=>document.querySelector(s),days=['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
 let openTechnique=null;
 const stretch=initStretch($('#stretch-view'),()=>openTechnique);
-let data={plans:[],schedule:{weekdays:{},revision:1},sessions:[],history:[]},selectedDate=today(),week=weekStart(today()),selectedPlan='legs',view='today',group='all',query='',mobileSidebar=false,busy=false,online=false,editingId=null,editorItems=[],loadNumber=0;
-let loadedWeek=null, guidedKey=null, todayHtml=null, strengthView='today';
+let data={plans:[],schedule:{weekdays:{},revision:1},sessions:[],history:[]},selectedDate=today(),week=weekStart(today()),selectedPlan='legs',view='day',group='all',query='',mobileSidebar=false,busy=false,online=false,editingId=null,editorItems=[],loadNumber=0;
+let loadedWeek=null, guidedKey=null, todayHtml=null, strengthView='day';
+let dayCatalogOpen=false, dayMode='strength', imageExercise=null;
 const plural=(n,a,b,c)=>n%100>=11&&n%100<=14?c:n%10===1?a:n%10>=2&&n%10<=4?b:c;
 const exerciseWord=n=>plural(n,'упражнение','упражнения','упражнений');
 const strengthGroups=[{id:'all',title:'Все группы мышц',count:exercises.length},...groups];
 const stretchGroups=strengthGroups.map(g=>({...g,count:g.id==='all'?stretches.length:stretches.filter(e=>e.group===g.id).length}));
 const ui={};
+const activeMode=()=>view==='day'?dayMode:view==='stretch'?'stretch':'strength';
+const catalogFilters=()=>activeMode()==='stretch'?stretch.filters:{group,query};
 try{selectedPlan=localStorage.getItem('juligym2:selected-plan')||selectedPlan;}catch{}
 const narrow=matchMedia('(max-width:1000px)');
 function closeSidebar(focus=false){mobileSidebar=false;document.body.classList.remove('sidebar-open');$('#menu-open').setAttribute('aria-expanded','false');$('.sidebar').inert=narrow.matches;$('#main').inert=false;$('.mobile-nav').inert=false;if(focus)$('#menu-open').focus();}
@@ -57,6 +61,12 @@ async function mutate(path,body){
  loadNumber++;busy=true;renderBusy();
  try{
   const result=await request(path,body);
+  if(path==='day-exercise'){
+   const {plan,schedule}=result;
+   if(plan)data.plans=[...data.plans.filter(saved=>saved.id!==plan.id),plan];
+   data.schedule=schedule;
+   cacheDiary();
+  }
   const session=result.session;
   if(session){
    const index=data.sessions.findIndex(saved=>saved.id===session.id);
@@ -87,23 +97,25 @@ function renderBusy(){
  document.querySelectorAll('[data-write]').forEach(button=>{
   let disabled=readOnly;
   if(button.hasAttribute('data-today-start'))disabled ||= loadedWeek!==weekStart(today());
+  if(button.hasAttribute('data-day-start'))disabled ||= loadedWeek!==weekStart(view==='today'?today():button.dataset.workoutDate);
   if(button.hasAttribute('data-set')||button.hasAttribute('data-guided-set'))disabled ||= future||!!session?.finished_at;
   if(button.id==='finish-workout'||button.id==='guided-finish')disabled ||= future||!session||!!session.finished_at||!progress.total||progress.done!==progress.total;
   button.disabled=disabled;
  });
  $('#training-start').disabled=readOnly||!selected()||future;
+ $('#day-offline').hidden=online||!data.plans.length;
  $('#today-offline').hidden=online||!data.plans.length;
  $('#guided-offline').hidden=online||!!session?.finished_at;
  $('#busy-indicator').hidden=!busy;
 }
 function sidebar(){
- const stretching=view==='stretch';
- const filters=stretching?stretch.filters:{group,query};
+ const stretching=activeMode()==='stretch';
+ const filters=catalogFilters();
  const search=$('#search');
  $('#sidebar-caption').textContent=stretching?'БИБЛИОТЕКА РАСТЯЖКИ':'СИЛОВАЯ БИБЛИОТЕКА';
  search.placeholder=stretching?'Поиск растяжки…':'Поиск упражнений…';
  if(search.value!==filters.query)search.value=filters.query;
- $('.search-submit').hidden=!stretching;
+ $('.search-submit').hidden=!stretching&&view!=='day';
  $('#brand').innerHTML=`${icon('leaf')}<span>Моя домашняя<br>тренировка</span>`;
  const groupNav=$('#muscle-groups');
  const catalogKey=`${stretching?'stretch':'strength'}:${filters.group}`;
@@ -114,7 +126,7 @@ function sidebar(){
   }).join('');
   groupNav.dataset.catalog=catalogKey;
  }
- $('#sidebar-create').innerHTML=stretching?icon('arrow')+' Моя подборка':icon('plus')+' Создать подборку';
+ $('#sidebar-create').innerHTML=view==='day'?icon('plus')+' Добавить в день':stretching?icon('arrow')+' Моя подборка':icon('plus')+' Создать подборку';
  $('#sidebar-foot').innerHTML=`${icon('user')}<div><strong>Дневник Юли</strong><small>Общий · вход по паролю</small></div>`;
 }
 function renderWeek(){
@@ -125,7 +137,8 @@ function renderWeek(){
  $('#week-days').innerHTML=days.map((label,i)=>{const date=addDays(week,i),isToday=date===today(),done=finished.has(date),planned=data.schedule?.weekdays?.[i];return `<button data-date="${date}" class="week-day ${date===selectedDate?'selected':''} ${isToday?'today':''} ${done?'completed':''}" aria-pressed="${date===selectedDate}" aria-label="${formatDate(date)}${done?', тренировка выполнена':planned?', тренировка запланирована':', отдых'}"><span>${label}</span><small>${formatDate(date,{day:'numeric',month:'short'})}</small><span class="day-marker">${done?icon('check'):isToday?icon('flame'):active.has(date)?'<i></i>':''}</span><em>${isToday?'Сегодня':done?'Готово':planned?'По плану':'Отдых'}</em></button>`;}).join('');
 }
 function renderPlans(){
- $('#plans').innerHTML=data.plans.map(plan=>{const sess=data.sessions.find(s=>s.plan_id===plan.id&&s.workout_date===selectedDate),p=summary(sess||{items:plan.items,marks:{}}),g=byId[plan.items[0]?.id]?.group||'all';return `<button data-plan="${plan.id}" class="plan-card ${plan.id===selectedPlan?'active':''}" aria-pressed="${plan.id===selectedPlan}"><span class="plan-badge">${sess?.finished_at?'ВЫПОЛНЕНО':plan.id===selectedPlan?'АКТИВНАЯ':'ПОДБОРКА'}</span><h3>${esc(plan.title)}</h3><p>${plan.items.length} ${exerciseWord(plan.items.length)} · ≈ ${estimatedMinutes(plan)} мин</p><div class="progress-line"><span style="width:${p.percent}%"></span></div><div class="plan-percent"><span>${sess?.finished_at?'Сохранено в дневнике':p.done?`${p.done} из ${p.total} подходов`:'Запланировано'}</span><strong>${p.percent}%</strong></div>${anatomy(g,'plan-anatomy')}<span class="plan-action">${plan.id===selectedPlan?'К упражнениям':'Открыть'} ${icon('arrow')}</span></button>`;}).join('');
+ const plans=data.plans.filter(plan=>!plan.id.startsWith('weekday-')||plan.id===selectedPlan);
+ $('#plans').innerHTML=plans.map(plan=>{const sess=data.sessions.find(s=>s.plan_id===plan.id&&s.workout_date===selectedDate),p=summary(sess||{items:plan.items,marks:{}}),g=byId[plan.items[0]?.id]?.group||'all';return `<button data-plan="${plan.id}" class="plan-card ${plan.id===selectedPlan?'active':''}" aria-pressed="${plan.id===selectedPlan}"><span class="plan-badge">${sess?.finished_at?'ВЫПОЛНЕНО':plan.id===selectedPlan?'АКТИВНАЯ':'ПОДБОРКА'}</span><h3>${esc(plan.title)}</h3><p>${plan.items.length} ${exerciseWord(plan.items.length)} · ≈ ${estimatedMinutes(plan)} мин</p><div class="progress-line"><span style="width:${p.percent}%"></span></div><div class="plan-percent"><span>${sess?.finished_at?'Сохранено в дневнике':p.done?`${p.done} из ${p.total} подходов`:'Запланировано'}</span><strong>${p.percent}%</strong></div>${anatomy(g,'plan-anatomy')}<span class="plan-action">${plan.id===selectedPlan?'К упражнениям':'Открыть'} ${icon('arrow')}</span></button>`;}).join('');
 }
 function exerciseCard(item,index,kind='exercise'){
  const e=byId[item.id];
@@ -146,7 +159,7 @@ function exerciseCard(item,index,kind='exercise'){
    <div class="completion-count">${icon('check')}<span>${library?'Инвентарь':'Выполнено'}<strong>${library?esc(e.equipment):`${count} / ${sets}`}</strong></span></div>
   </div>`;
  let actions='';
- if(library)actions=`<button class="button secondary add-library" data-add-library="${e.id}">${icon('plus')} Добавить в подборку</button>`;
+ if(library)actions=dayEditButton(e.id,inDay(e.id));
  if(!library&&!guided)actions=`<div class="set-buttons">${Array.from({length:sets},(_,i)=>{
   const key=`${e.id}:${i}`;
   const marked=marks[key]===true;
@@ -163,28 +176,61 @@ function exerciseCard(item,index,kind='exercise'){
 }
 function renderWorkout(){
  const plan=selected(),session=currentSession(),items=currentItems(),p=summary(session||{items,marks:{}});
+ const stretchIds=(session||plan)?.stretch_ids||[];
  $('#workout-title').textContent=session?.title||plan?.title||'Выберите тренировку';
  $('#date-badge').textContent=selectedDate===today()?'СЕГОДНЯ':formatDate(selectedDate);
  $('#workout-progress').innerHTML=`<div><span>Прогресс тренировки</span><span>${p.complete} / ${items.length} упражнений</span></div><div class="progress-line"><span style="width:${p.percent}%"></span></div><p>${icon(session?.finished_at?'check':'clock')}${session?.finished_at?'Занятие завершено и сохранено в общем дневнике.':p.done?`${p.percent}% · ${p.done} из ${p.total} подходов`:'Начните с разминки и двигайтесь в своём темпе.'}</p>`;
- $('#exercises').innerHTML=items.map((item,i)=>exerciseCard(item,i)).join('')||'<p class="empty">Создайте подборку из библиотеки.</p>';
+ $('#exercises').innerHTML=items.map((item,i)=>exerciseCard(item,i)).join('')||`<p class="empty">${stretchIds.length?'В этом занятии только растяжка.':'Создайте подборку из библиотеки.'}</p>`;
 
  $('#session-actions').innerHTML=`${session?.finished_at?`<div class="session-saved">${icon('check')} Тренировка выполнена · ${formatDate(selectedDate)}<span>${Math.max(1,Math.round(session.duration_seconds/60))} мин</span></div>`:`<button class="button primary" id="finish-workout" data-write ${p.done!==p.total||!p.total?'disabled':''}>${icon('check')} Завершить тренировку</button><p>Завершите все подходы — занятие попадёт в историю, а день получит отметку ✓.</p>`}`;
- $('#training-start').innerHTML=icon('play')+(session?.finished_at?'Посмотреть занятие':session?'Продолжить':'Начать тренировку');
+ $('#training-start').innerHTML=icon('play')+(session?.finished_at?'Посмотреть занятие':session?'Продолжить':!items.length&&stretchIds.length?'Начать растяжку':'Начать тренировку');
  $('#edit-plan').disabled=!plan;
- $('#stretch-after').hidden=!items.length;
+ $('#stretch-after').hidden=!items.length&&!stretchIds.length;
+ $('#stretch-after').textContent=items.length?'Растяжка после тренировки →':'Открыть растяжку →';
 }
 function renderLibrary(){
  const q=query.trim().toLocaleLowerCase('ru');const filtered=exercises.filter(e=>(group==='all'||e.group===group)&&(`${e.title} ${e.muscles} ${e.equipment}`).toLocaleLowerCase('ru').includes(q));
  $('#library-title').textContent=groups.find(g=>g.id===group)?.title||'Все группы мышц';$('#library-count').textContent=filtered.length+' '+exerciseWord(filtered.length);
+ $('#library-day').textContent=`Упражнения добавляются в план на ${formatDate(selectedDate)}.`;
  $('#library-grid').innerHTML=filtered.map((e,i)=>exerciseCard(e,i,'library')).join('')||'<p class="empty">Ничего не найдено. Измените название или группу мышц.</p>';
 }
 function renderHistory(){
  $('#history-list').innerHTML=data.history.length?data.history.map(h=>`<button class="history-row" data-history-date="${h.workout_date}" data-history-plan="${h.plan_id}"><span class="history-check">${icon('check')}</span><span><strong>${esc(h.title)}</strong><small>${formatDate(h.workout_date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</small></span><span>${Math.max(1,Math.round(h.duration_seconds/60))} мин</span>${icon('chevron')}</button>`).join(''):'<div class="empty">Здесь появятся реальные завершённые занятия Юли.<br>Отметьте подходы и завершите тренировку.</div>';
  $('#history-total').textContent=data.history.length;
 }
+function inDay(id){
+ const plan=plannedWorkout(data,selectedDate);
+ return Boolean(plan?.items.some(item=>item.id===id)||plan?.stretch_ids?.includes(id));
+}
+function updateImageAction(){
+ const action=$('#image-day-action');
+ action.hidden=!imageExercise||!(['day','library'].includes(view)||(view==='stretch'&&!$('#stretch-home').hidden));
+ if(!action.hidden)action.innerHTML=`<span>На ${formatDate(selectedDate)}</span>${dayEditButton(imageExercise,inDay(imageExercise))}`;
+}
+function renderDayCatalog(){
+ $('#day-catalog').hidden=!dayCatalogOpen;
+ if(!dayCatalogOpen)return;
+ const filters=catalogFilters();
+ const search=$('#day-search');
+ $('#day-catalog-date').textContent=`ДОБАВЛЯЕМ НА ${formatDate(selectedDate)}`;
+ $('#day-catalog-title').textContent=dayMode==='stretch'?'Библиотека растяжки':'Силовая библиотека';
+ search.placeholder=dayMode==='stretch'?'Поиск растяжки…':'Поиск упражнений…';
+ if(search.value!==filters.query)search.value=filters.query;
+ $('#day-group').value=filters.group;
+ $('#day-catalog').querySelectorAll('[data-day-catalog]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.dayCatalog===dayMode)));
+ const html=catalogMarkup(dayMode,filters,plannedWorkout(data,selectedDate));
+ if(html!==ui.dayLibraryHtml){$('#day-library').innerHTML=html;ui.dayLibraryHtml=html;}
+}
+function renderDay(){
+ const {intro,lists}=dayMarkup(data,selectedDate);
+ if(intro!==ui.dayIntro){$('#day-intro').innerHTML=intro;ui.dayIntro=intro;}
+ if(lists!==ui.dayLists){$('#day-lists').innerHTML=lists;ui.dayLists=lists;}
+ renderDayCatalog();
+}
 function render(){
  try{localStorage.setItem('juligym2:selected-plan',selectedPlan);}catch{}
  sidebar();renderWeek();renderPlans();renderWorkout();
+ if(view==='day')renderDay();
  if(view==='library')renderLibrary();
  if(view==='history')renderHistory();
  if(view==='today'){
@@ -204,7 +250,8 @@ function render(){
  $('.week-section').hidden=['today','stretch','guided'].includes(view);
  document.querySelectorAll('[data-view-panel]').forEach(panel=>panel.hidden=panel.dataset.viewPanel!==view);
  document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-current',button.dataset.view===(view==='guided'?'workout':view)?'page':'false'));
- document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===(view==='stretch'?'stretch':'strength'))));
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===activeMode())));
+ if($('#image-dialog').open)updateImageAction();
  renderBusy();
 }
 
@@ -220,12 +267,64 @@ function revealStretchSection(selector='#stretch-library-title',focus=true){
  heading.scrollIntoView({block:'start',behavior:'instant'});
 }
 
+function openDayCatalog(mode=dayMode,focus=true){
+ dayMode=mode;
+ dayCatalogOpen=true;
+ sidebar();
+ renderDayCatalog();
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===dayMode)));
+ renderBusy();
+ if(!mobileSidebar){
+  if(focus)$('#day-catalog-title').focus({preventScroll:true});
+  $('#day-catalog').scrollIntoView({block:'start',behavior:'instant'});
+ }
+}
+
+function filterDay(next){
+ if(dayMode==='stretch')stretch.filterCatalog(next);
+ else if(next.group!==undefined)group=next.group;
+ else query=next.query;
+ if(!dayCatalogOpen)openDayCatalog(dayMode,false);
+ else{sidebar();renderDayCatalog();renderBusy();}
+}
+
+async function editDay(id,added){
+ if(busy||!online)return;
+ const date=selectedDate;
+ const result=await mutate('day-exercise',{weekday:dayIndex(date),exerciseId:id,added});
+ if(!result){await load(true);return;}
+ render();
+ notify(added?`Добавлено на ${formatDate(date)}.`:`Убрано из плана на ${formatDate(date)}.`);
+}
+
+async function beginDay(date,planId){
+ const saved=data.sessions.find(session=>session.workout_date===date&&session.plan_id===planId);
+ const plan=saved||data.plans.find(plan=>plan.id===planId);
+ if(!plan||date>today())return;
+ if(!saved?.finished_at){await beginGuided(date,planId);return;}
+ if(!plan.stretch_ids?.length)return;
+ selectedDate=date;
+ selectedPlan=planId;
+ setView('stretch');
+ stretch.start(plan.title,plan.stretch_ids);
+ renderBusy();
+}
+
+async function finishDayStretch(date,planId){
+ const result=await mutate('finish',{date,planId});
+ if(!result)return;
+ stretch.openCatalog();
+ if(view==='stretch'){selectedDate=date;week=weekStart(date);dayCatalogOpen=false;setView('day');}
+ else render();
+ notify('Растяжка сохранена. День отмечен в календаре.');
+}
+
 function setView(next,closeMenu=true){
  if(view!==next&&(['stretch','guided'].includes(view)||['stretch','guided'].includes(next))){stopTimer();keepAwake(false);}
  if(view==='guided'&&next!=='guided')document.body.insertBefore($('#timer'),$('#toast'));
  if(view!=='guided'&&next==='guided')$('#guided-timer-slot').append($('#timer'));
  view=next;
- if(['today','workout','guided','library'].includes(view))strengthView=view;
+ if(['day','today','workout','guided','library'].includes(view))strengthView=view;
  if(view==='today'){
   week=weekStart(today());
   if(weekStart(selectedDate)!==week)selectedDate=today();
@@ -246,6 +345,12 @@ async function beginGuided(date,planId){
  selectedDate=date;
  selectedPlan=planId;
  week=weekStart(date);
+ if(!result.session.items.length&&result.session.stretch_ids?.length){
+  setView('stretch');
+  stretch.start(result.session.title,result.session.stretch_ids,result.session.finished_at?undefined:result.session);
+  renderBusy();
+  return;
+ }
  setView('guided');
  keepAwake(!result.session.finished_at);
 }
@@ -282,21 +387,51 @@ async function finishTraining(){
  notify('Тренировка Юли сохранена. День отмечен в календаре.');
  await load(true);
 }
-function openEditor(id=null,addId=null){editingId=id;const plan=data.plans.find(p=>p.id===id);editorItems=(plan?.items||[]).map(i=>({...i}));if(addId)editorItems.push({id:addId,sets:2,reps:byId[addId].reps,rest:byId[addId].rest});$('#editor-title').textContent=id?'Изменить подборку':'Новая подборка';$('#plan-name').value=plan?.title||'';$('#editor-search').value='';renderEditor();$('#editor-dialog').showModal();}
+function openEditor(id=null){editingId=id;const plan=data.plans.find(p=>p.id===id);editorItems=(plan?.items||[]).map(i=>({...i}));$('#editor-title').textContent=id?'Изменить подборку':'Новая подборка';$('#plan-name').value=plan?.title||'';$('#editor-search').value='';renderEditor();$('#editor-dialog').showModal();}
 function renderEditor(){
  $('#editor-selected').innerHTML=editorItems.map((item,i)=>`<div class="editor-item"><div><strong>${byId[item.id].title}</strong><small>${byId[item.id].muscles}</small></div><label>Подходы<select data-editor-sets="${item.id}" aria-label="Подходы: ${byId[item.id].title}">${[1,2,3,4,5].map(n=>`<option ${item.sets===n?'selected':''}>${n}</option>`).join('')}</select></label><label>Повторы<input data-editor-reps="${item.id}" value="${esc(item.reps)}" maxlength="10" aria-label="Повторы: ${byId[item.id].title}"></label><label>Отдых<select data-editor-rest="${item.id}" aria-label="Отдых: ${byId[item.id].title}">${[15,30,45,60,75,90,120,180].map(n=>`<option ${item.rest===n?'selected':''} value="${n}">${n} с</option>`).join('')}</select></label><div class="editor-move"><button data-editor-up="${i}" ${i===0?'disabled':''} aria-label="Выше: ${byId[item.id].title}">↑</button><button data-editor-remove="${item.id}" aria-label="Удалить: ${byId[item.id].title}">${icon('close')}</button></div></div>`).join('')||'<p class="empty">Выберите движения ниже. До 20 упражнений в подборке.</p>';
  const q=$('#editor-search').value.toLowerCase();$('#editor-options').innerHTML=exercises.filter(e=>!editorItems.some(i=>i.id===e.id)&&(!q||(`${e.title} ${e.muscles}`).toLowerCase().includes(q))).map(e=>`<button data-editor-add="${e.id}"><span>${e.title}<small>${groups.find(g=>g.id===e.group).title} · ${e.level}</small></span>${icon('plus')}</button>`).join('');$('#editor-counter').textContent=editorItems.length+' / 20';
 }
 function openSchedule(){
- $('#schedule-days').innerHTML=days.map((d,i)=>`<label>${d}<select data-schedule-day="${i}"><option value="">Отдых</option>${data.plans.map(p=>`<option value="${p.id}" ${data.schedule.weekdays[i]===p.id?'selected':''}>${esc(p.title)}</option>`).join('')}</select></label>`).join('');$('#schedule-dialog').showModal();
+ $('#schedule-days').innerHTML=days.map((d,i)=>`<label>${d}<select data-schedule-day="${i}"><option value="">Отдых</option>${data.plans.filter(p=>!p.id.startsWith('weekday-')||p.id===data.schedule.weekdays[i]).map(p=>`<option value="${p.id}" ${data.schedule.weekdays[i]===p.id?'selected':''}>${esc(p.title)}</option>`).join('')}</select></label>`).join('');$('#schedule-dialog').showModal();
 }
 document.addEventListener('click',async event=>{
  if(!isUnlocked())return;
  const hint=event.target.closest('.technique>summary');if(hint){event.preventDefault();const panel=hint.parentElement;openTechnique=panel.open?null:panel.dataset.technique;document.querySelectorAll('.technique').forEach(d=>d.open=d.dataset.technique===openTechnique);return;}
  if(event.target.closest('#lock-access')){stopTimer();keepAwake(false);lockAccess();return;}
  const b=event.target.closest('button');if(!b)return;
+ if(b.id==='day-stretch-routines'){stretch.openCatalog();setView('stretch');return;}
+ if(b.dataset.dayEdit){await editDay(b.dataset.dayEdit,b.dataset.dayAdded==='true');return;}
+ if(b.hasAttribute('data-day-start')){await beginDay(b.dataset.workoutDate,b.dataset.workoutPlan);return;}
+ if(b.hasAttribute('data-day-stretch-finish')){await finishDayStretch(b.dataset.workoutDate,b.dataset.workoutPlan);return;}
+ if(b.hasAttribute('data-day-stretch-preview')){
+  const plan=plannedWorkout(data,selectedDate);
+  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids);}
+  return;
+ }
+ if(view==='day'){
+  if(b.dataset.dayCatalog||b.dataset.mode||['library','stretch'].includes(b.dataset.view)||b.id==='sidebar-create'){
+   closeSidebar();
+   openDayCatalog(b.dataset.dayCatalog||b.dataset.mode||(b.dataset.view==='stretch'?'stretch':dayMode));
+   return;
+  }
+  if(b.dataset.group){
+   closeSidebar();
+   filterDay({group:b.dataset.group});
+   openDayCatalog();
+   return;
+  }
+  if(b.id==='day-catalog-close'){
+   dayCatalogOpen=false;
+   renderDayCatalog();
+   $('#day-title').focus({preventScroll:true});
+   $('#week-days').scrollIntoView({block:'start',behavior:'instant'});
+   return;
+  }
+ }
  if(b.dataset.mode){
   const next=b.dataset.mode==='stretch'?'stretch':strengthView;
+  if(next==='day')dayMode='strength';
   if(next!==view)setView(next);
   return;
  }
@@ -320,8 +455,11 @@ document.addEventListener('click',async event=>{
   }
  }
  if(b.dataset.group){group=b.dataset.group;setView('library');}
+ if(b.dataset.view==='day')dayCatalogOpen=false;
  if(b.dataset.view)setView(b.dataset.view);
  if(b.id==='stretch-after'||b.hasAttribute('data-workout-stretch')){
+  const plan=currentSession()||selected();
+  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids);return;}
   stretch.recommend(currentItems().map(item=>byId[item.id]?.group));
   setView('stretch');
   $('#stretch-cooldown button').focus({preventScroll:true});
@@ -329,8 +467,7 @@ document.addEventListener('click',async event=>{
  if(b.id==='today-choose'){
   selectedDate=today();
   week=weekStart(selectedDate);
-  selectedPlan=data.schedule?.weekdays?.[dayIndex(selectedDate)]||selectedPlan;
-  setView('workout');
+  setView('day');
   if(loadedWeek!==week)await load(true);
  }
  if(b.hasAttribute('data-today-start')&&loadedWeek===weekStart(today()))await beginGuided(b.dataset.workoutDate,b.dataset.workoutPlan);
@@ -340,12 +477,11 @@ document.addEventListener('click',async event=>{
   $('#session-actions').scrollIntoView({block:'center'});
  }
  if(b.dataset.plan){selectedPlan=b.dataset.plan;stopTimer();render();$('#current-workout').scrollIntoView({behavior:'smooth',block:'start'});}
- if(b.dataset.date){selectedDate=b.dataset.date;selectedPlan=data.schedule?.weekdays?.[dayIndex(selectedDate)]||selectedPlan;stopTimer();render();}
- if(b.dataset.week){week=addDays(week,Number(b.dataset.week)*7);selectedDate=week;await load();}
- if(b.id==='current-week'){week=weekStart(today());selectedDate=today();selectedPlan=data.schedule?.weekdays?.[dayIndex(selectedDate)]||selectedPlan;await load();}
+ if(b.dataset.date){selectedDate=b.dataset.date;selectedPlan=data.schedule?.weekdays?.[dayIndex(selectedDate)]||selectedPlan;dayCatalogOpen=false;stopTimer();render();}
+ if(b.dataset.week){week=addDays(week,Number(b.dataset.week)*7);selectedDate=week;dayCatalogOpen=false;await load();}
+ if(b.id==='current-week'){week=weekStart(today());selectedDate=today();selectedPlan=data.schedule?.weekdays?.[dayIndex(selectedDate)]||selectedPlan;dayCatalogOpen=false;await load();}
  if(b.id==='sidebar-create'||b.id==='create-plan')openEditor();
  if(b.id==='edit-plan')openEditor(selectedPlan);
- if(b.dataset.addLibrary)openEditor(null,b.dataset.addLibrary);
  if(b.dataset.editorAdd){if(editorItems.length>=20)return notify('Максимум 20 упражнений в подборке.',true);const e=byId[b.dataset.editorAdd];editorItems.push({id:e.id,sets:2,reps:e.reps,rest:e.rest});renderEditor();}
  if(b.dataset.editorRemove){editorItems=editorItems.filter(i=>i.id!==b.dataset.editorRemove);renderEditor();}
  if(b.dataset.editorUp){const i=Number(b.dataset.editorUp);[editorItems[i-1],editorItems[i]]=[editorItems[i],editorItems[i-1]];renderEditor();}
@@ -360,7 +496,8 @@ document.addEventListener('click',async event=>{
  if(b.dataset.guidedHold)startTimer(Number(b.dataset.guidedHold),'Удержание','Удержание завершено. Можно отметить подход.');
  if(b.id==='finish-workout'||b.id==='guided-finish')await finishTraining();
  if(b.dataset.rest)startTimer(Number(b.dataset.rest));
- if(b.dataset.image){const e=byId[b.dataset.image]||stretchById[b.dataset.image];$('#image-title').textContent=e.title;$('#image-large').src=`./media/${e.id}.webp`;$('#image-large').alt=`${e.title}: три фазы движения`;$('#image-steps').innerHTML=e.steps.map(s=>`<li>${s}</li>`).join('');$('#image-cue').textContent=e.cue;$('#image-dialog').showModal();}
+ if(b.dataset.image){const e=byId[b.dataset.image]||stretchById[b.dataset.image];imageExercise=e.id;$('#image-title').textContent=e.title;$('#image-large').src=`./media/${e.id}.webp`;$('#image-large').alt=`${e.title}: три фазы движения`;$('#image-steps').innerHTML=e.steps.map(s=>`<li>${s}</li>`).join('');$('#image-cue').textContent=e.cue;updateImageAction();renderBusy();$('#image-dialog').showModal();}
+ if(b.hasAttribute('data-stretch-next')||b.hasAttribute('data-stretch-skip'))renderBusy();
  if(b.id==='menu-open'){mobileSidebar=!mobileSidebar;document.body.classList.toggle('sidebar-open',mobileSidebar);b.setAttribute('aria-expanded',String(mobileSidebar));$('.sidebar').inert=!mobileSidebar;$('#main').inert=mobileSidebar;$('.mobile-nav').inert=mobileSidebar;if(mobileSidebar)$('#brand').focus({preventScroll:true});}
  if(b.id==='sidebar-backdrop')closeSidebar(true);
  if(b.id==='settings-open')$('#settings-dialog').showModal();
@@ -371,6 +508,7 @@ document.addEventListener('click',async event=>{
 document.addEventListener('change',event=>{const e=event.target;if(e.dataset.editorSets)editorItems.find(i=>i.id===e.dataset.editorSets).sets=Number(e.value);if(e.dataset.editorReps)editorItems.find(i=>i.id===e.dataset.editorReps).reps=e.value;if(e.dataset.editorRest)editorItems.find(i=>i.id===e.dataset.editorRest).rest=Number(e.value);});
 $('#search').addEventListener('input',event=>{
  const value=event.target.value;
+ if(view==='day'){filterDay({query:value});return;}
  if(view==='stretch'){
   stretch.filterCatalog({query:value});
   if(!mobileSidebar)revealStretchSection('#stretch-library-title',false);
@@ -381,11 +519,15 @@ $('#search').addEventListener('input',event=>{
 });
 $('#library-search').addEventListener('submit',event=>{
  event.preventDefault();
+ if(view==='day'){closeSidebar();openDayCatalog();return;}
  if(view==='stretch'){
   closeSidebar();
   revealStretchSection();
  }
 });
+$('#day-group').innerHTML=catalogGroupOptions;
+$('#day-group').addEventListener('change',event=>filterDay({group:event.target.value}));
+$('#day-search').addEventListener('input',event=>filterDay({query:event.target.value}));
 $('#editor-search').addEventListener('input',renderEditor);
 $('#plan-form').addEventListener('submit',async event=>{event.preventDefault();const p=data.plans.find(p=>p.id===editingId),result=await mutate('plans',{id:editingId||undefined,revision:p?.revision,title:$('#plan-name').value,items:editorItems});if(result){selectedPlan=result.plan.id;await load(true);$('#editor-dialog').close();setView('workout');notify('Подборка сохранена в общем дневнике.');}});
 $('#schedule-form').addEventListener('submit',async event=>{event.preventDefault();const weekdays={};document.querySelectorAll('[data-schedule-day]').forEach(e=>{if(e.value)weekdays[e.dataset.scheduleDay]=e.value;});const result=await mutate('schedule',{weekdays,revision:data.schedule.revision});if(result){data.schedule=result.schedule;$('#schedule-dialog').close();render();notify('Расписание обновлено для всех посетителей.');}});
