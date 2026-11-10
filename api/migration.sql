@@ -20,3 +20,7 @@ ALTER TABLE juli_plans ADD COLUMN IF NOT EXISTS stretch_ids jsonb NOT NULL DEFAU
 ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS stretch_ids jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE juli_plans ADD COLUMN IF NOT EXISTS stretch_settings jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS stretch_settings jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS stretch_state jsonb NOT NULL DEFAULT '{"position":0,"marks":{}}';
+ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS stretch_revision integer NOT NULL DEFAULT 0;
+ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS result_status text;
+ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS result_summary jsonb;

@@ -40,6 +40,7 @@ const add=(date,n)=>new Date(day(date).valueOf()+n*86400000).toISOString().slice
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   async function enter(){await page.locator('#access-password').fill(password);await page.locator('#access-form [type=submit]').click();await page.locator('#access-dialog').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));}
   async function selectDate(){
+   await page.locator('.mobile-nav [data-view=day]').click();
    for(let i=0;i<32&&!await page.locator(`[data-date="${date}"]`).count();i++){
     const first=await page.locator('#week-days button').first().getAttribute('data-date');
     await page.locator('[data-week="-1"]').click();
@@ -89,13 +90,13 @@ const add=(date,n)=>new Date(day(date).valueOf()+n*86400000).toISOString().slice
   assert.match(await page.locator('[data-stretch-hold]').innerText(),/55 с/);
   await page.locator('[data-stretch-hold]').click();assert.match(await page.locator('[data-time]').innerText(),/00:5[45]/);
   await page.locator('.mobile-nav [data-view=day]').click();
-  await page.locator('[data-day-start]').click();await page.waitForSelector('#guided-mark');
+  await page.locator('#day-view [data-day-start]').click();await page.waitForSelector('#guided-mark');
   assert.equal(await page.locator('#guided-step').innerText(),'Подход 1 из 3');
   assert.match(await page.locator('#guided-content').innerText(),/18/);
   const snapshot=(await read(date)).sessions.find(s=>s.plan_id==='weekday-5');
   await dose('legs01','sets',2);await dose('legs01','reps','12');await dose('stretch-sphinx','seconds',25);
   assert.deepEqual((await call('start',{date,planId:'weekday-5'})).session,snapshot,'Active session retains dose snapshot');
-  await page.reload();await enter();await selectDate();await page.locator('[data-day-start]').click();
+  await page.reload();await enter();await selectDate();await page.locator('#day-view [data-day-start]').click();
   assert.equal(await page.locator('#guided-step').innerText(),'Подход 1 из 3');
   await page.locator('[data-view=workout]').last().evaluate(button=>button.click());await page.locator('#stretch-after').click();
   assert.match(await page.locator('[data-stretch-hold]').innerText(),/55 с/,'Cooldown keeps saved session settings');

@@ -12,7 +12,9 @@
     "test:browser": "node scripts/check-app.cjs",
     "test:day-settings": "node scripts/check-day-settings.cjs",
     "test:pwa": "node scripts/check-pwa.cjs",
-    "test:access": "node scripts/check-access.cjs"
+    "test:access": "node scripts/check-access.cjs",
+    "test:session": "node scripts/check-first-package.cjs",
+    "test:update": "node scripts/check-session-update.cjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

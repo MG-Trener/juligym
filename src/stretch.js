@@ -1,9 +1,13 @@
 import {groups} from './catalog.js';
 import {icon, anatomy} from './icons.js';
 import {stretches, stretchById, stretchPresets, stretchCooldown} from './stretch-catalog.js';
-import {keepAwake, startTimer, stopTimer} from './timer.js';
+import {keepAwake, startTimer, stopTimer, observeTimer, timerSnapshot, restoreTimer} from './timer.js';
 import {stretchExercise} from './day-settings.js';
 
+import {stretchSteps,sessionResult} from './session-progress.js';
+import {today,escape as esc} from './state.js';
+
+const resumeKey='juligym2:stretch-session-v1';
 const selectionKey = 'juligym2:stretch-selection';
 const groupFilters = [{id: 'all', title: 'Все группы'}, ...groups];
 const holdMessage = 'Удержание завершено. Плавно выйдите из положения.';
@@ -46,12 +50,32 @@ function exerciseCard(exercise, selected, openTechnique, side = 0) {
   </article>`;
 }
 
-export function initStretch(root, getOpenTechnique) {
+export function initStretch(root, getOpenTechnique, hooks={}) {
   let group = 'all';
   let query = '';
   let selection = [];
   let workoutCooldown = [];
-  let session = null;
+  let session = null, active=false, saving=false, timer=null,lastStored='';
+  try{
+    const saved=JSON.parse(localStorage.getItem(resumeKey));
+    if(saved?.day?.id&&!saved.day.finished_at&&Array.isArray(saved.day.stretch_ids)&&saved.day.stretch_ids.every(id=>Object.hasOwn(stretchById,id))){session=saved;timer=saved.timer;}
+  }catch{}
+  function persist(){if(!session)return;try{const value=JSON.stringify({...session,timer});if(value!==lastStored){localStorage.setItem(resumeKey,value);lastStored=value;}}catch{}}
+  function suspend(){if(active){timer=timerSnapshot();persist();}active=false;}
+  observeTimer(value=>{if(active&&session){timer=value;persist();}});
+  addEventListener('pagehide',suspend);
+  function bindDay(day){
+    session={title:day.title,steps:stretchSteps(day.stretch_ids),exerciseCount:day.stretch_ids.length,position:day.stretch_state?.position||0,marks:day.stretch_state?.marks||{},day,settings:day.stretch_settings||{}};
+  }
+  async function move(action){
+    if(saving||!session)return;
+    saving=true;guided.querySelectorAll('button').forEach(button=>button.disabled=true);
+    suspend();stopTimer();
+    const result=await hooks.save?.(session.day,action);
+    saving=false;
+    if(result){bindDay(result);timer=null;persist();}
+    showStep();
+  }
   try {
     const stored = JSON.parse(localStorage.getItem(selectionKey));
     if (Array.isArray(stored)) selection = [...new Set(stored.filter(id => typeof id === 'string' && Object.hasOwn(stretchById, id)))];
@@ -92,63 +116,69 @@ export function initStretch(root, getOpenTechnique) {
     root.classList.remove('stretch-in-session');
     home.hidden = false;
     guided.hidden = true;
-    resume.hidden = !session || session.position >= session.steps.length;
+    resume.hidden = !session || !!session.day.finished_at;
+    if(!resume.hidden)resume.textContent='Продолжить · '+session.title;
   }
 
   function openCatalog() {
     if (!home.hidden) return;
+    suspend();
     stopTimer();
     keepAwake(false);
     showHome();
   }
 
   function showStep() {
+    active=!root.hidden;
     root.classList.add('stretch-in-session');
     home.hidden = true;
     guided.hidden = false;
     const {title, steps, position, day} = session;
     const step = steps[position];
+    const result=sessionResult(day);
+    const savedLabel=result.status==='completed'?'Сохранить занятие':'Сохранить частичный результат';
+    const finish=`<details class="finish-choice"><summary>На сегодня всё</summary><p>В дневник попадёт только выполненное. Пропущенное не будет отмечено как готовое. После сохранения занятие закроется.</p><button class="button secondary" data-stretch-finish ${result.worked?'':'disabled'}>${savedLabel}</button></details>`;
     if (!step) {
-      guided.innerHTML = `<div class="stretch-complete">${icon('check')}<h2 tabindex="-1">Комплекс завершён</h2><p>${title}</p>${day ? `<button class="button primary" data-day-stretch-finish data-write data-workout-date="${day.workout_date}" data-workout-plan="${day.plan_id}">Сохранить в дневник</button>` : '<button class="button primary" data-stretch-home>К комплексам</button>'}</div>`;
+      guided.innerHTML = `<div class="stretch-complete">${icon('check')}<h2 tabindex="-1">${result.status==='completed'?'Растяжка выполнена':'Растяжка пройдена'}</h2><p>${esc(title)}</p><p>Выполнено шагов: ${result.stretch.done} из ${steps.length}${result.stretch.skipped?' · пропущено: '+result.stretch.skipped:''}</p><button class="button primary" data-stretch-finish ${result.worked?'':'disabled'}>${savedLabel}</button><button class="button quiet" data-stretch-previous>← Вернуться к упражнениям</button><button class="button quiet" data-stretch-home>К комплексам</button></div>`;
     } else {
       const exercise = stretchExercise(step.id,session.settings);
-      const side = exercise.unilateral ? ` · сторона ${step.side} из 2` : '';
-      const label = step.side === 1 && exercise.unilateral ? 'Сменить сторону' : position === steps.length - 1 ? 'Завершить' : 'Следующее упражнение';
+      const side = exercise.unilateral ? ` · ${step.side===1?'левая сторона':'правая сторона'}` : '';
+      const label = step.side === 1 && exercise.unilateral ? 'Левая готова → правая' : position === steps.length - 1 ? 'Готово → к результату' : 'Готово → дальше';
       guided.innerHTML = `<div class="stretch-step-heading">
         <button class="button quiet" data-stretch-home>← Комплексы</button>
-        <div><span class="eyebrow">${title}</span><h2 tabindex="-1">Движение ${step.exerciseIndex + 1} из ${session.exerciseCount}${side}</h2></div>
+        <div><span class="eyebrow">${esc(title)}</span><h2 tabindex="-1">Движение ${step.exerciseIndex + 1} из ${session.exerciseCount}${side}</h2></div>
       </div>
-      <progress class="stretch-progress" max="${steps.length}" value="${position}" aria-label="Пройдено шагов"></progress>
+      <progress class="stretch-progress" max="${steps.length}" value="${result.stretch.done}" aria-label="Выполнено шагов"></progress>
+      <p class="flow-save-note">${day.local?'Шаг сохранён на этом устройстве. Для записи в дневник понадобится интернет.':'Шаг сохранён. Можно вернуться к занятию позже.'}</p>
       ${exerciseCard(exercise, false, getOpenTechnique(), step.side)}
       <div class="stretch-step-actions">
         ${exercise.seconds ? `<button class="button secondary" data-stretch-hold>${icon('clock')} Удержание ${exercise.seconds} с</button>` : ''}
-        <button class="button primary" data-stretch-next>${label} ${icon('arrow')}</button>
+        <button class="button primary" data-stretch-next>${label}</button>
       </div>
       <div class="stretch-step-secondary">
         <button class="text-button" data-stretch-previous ${position === 0 ? 'disabled' : ''}>← Предыдущий шаг</button>
         <button class="text-button" data-stretch-skip>Пропустить движение</button>
-      </div>`;
+      </div>${finish}`;
     }
-    guided.querySelector('h2').focus({preventScroll: true});
-    root.scrollIntoView({block: 'start'});
+    if(active){
+      if(timer)restoreTimer(timer);
+      guided.querySelector('h2').focus({preventScroll: true});
+      root.scrollIntoView({block: 'start'});
+    }
   }
 
-  function goToStep(position) {
-    stopTimer();
-    keepAwake(false);
-    session.position = position;
-    showStep();
-  }
-
-  function start(title, ids, day, settings=day?.stretch_settings||{}) {
-    if (!ids.length) return;
-    if(day && session?.day?.id===day.id){showStep();return;}
-    const steps = ids.flatMap((id, exerciseIndex) => {
-      const first = {id, exerciseIndex, side: 1};
-      return stretchById[id].unilateral ? [first, {...first, side: 2}] : [first];
-    });
-    session = {title, steps, exerciseCount: ids.length, position: 0, day, settings};
-    goToStep(0);
+  async function start(title, ids, day, settings=day?.stretch_settings||{}) {
+    if(!ids.length||saving)return;
+    suspend();stopTimer();
+    const previousId=session?.day?.id;
+    if(!day||day.finished_at){
+      saving=true;
+      day=await hooks.start?.({title,ids,settings,date:today(),planId:'stretch-'+crypto.randomUUID()});
+      saving=false;
+      if(!day){showHome();return;}
+    }
+    if(previousId!==day.id||session?.position!==(day.stretch_state?.position||0))timer=null;
+    bindDay(day);persist();showStep();
   }
 
   root.querySelector('#stretch-presets').innerHTML = stretchPresets.map((preset, index) =>
@@ -160,9 +190,10 @@ export function initStretch(root, getOpenTechnique) {
   renderGroup();
   renderSelection();
 
-  root.addEventListener('click', event => {
+  showHome();
+  root.addEventListener('click', async event => {
     const button = event.target.closest('button');
-    if (!button) return;
+    if (!button||button.disabled||saving) return;
     const {stretchAdd, stretchRemove, stretchPreset} = button.dataset;
     if (stretchAdd || stretchRemove) {
       const id = stretchAdd || stretchRemove;
@@ -186,6 +217,7 @@ export function initStretch(root, getOpenTechnique) {
     if (button.hasAttribute('data-stretch-custom')) start('Моя подборка', selection);
     if (button.hasAttribute('data-stretch-after-start')) start('После тренировки', workoutCooldown);
     if (button.hasAttribute('data-stretch-home')) {
+      suspend();
       stopTimer();
       keepAwake(false);
       showHome();
@@ -194,19 +226,31 @@ export function initStretch(root, getOpenTechnique) {
     }
     if (button.hasAttribute('data-stretch-resume')) showStep();
     if (!session || guided.hidden) return;
-    const step = session.steps[session.position];
-    if (!step) return;
-    if (button.hasAttribute('data-stretch-hold')) startTimer(stretchExercise(step.id,session.settings).seconds, 'Удержание растяжки', holdMessage);
-    if (button.hasAttribute('data-stretch-next')) goToStep(session.position + 1);
-    if (button.hasAttribute('data-stretch-previous')) goToStep(session.position - 1);
-    if (button.hasAttribute('data-stretch-skip')) {
-      const next = session.steps.findIndex((item, index) => index > session.position && item.id !== step.id);
-      goToStep(next === -1 ? session.steps.length : next);
+    if(button.hasAttribute('data-stretch-finish')){
+      saving=true;guided.querySelectorAll('button').forEach(button=>button.disabled=true);suspend();stopTimer();
+      const result=await hooks.finish?.(session.day);
+      saving=false;
+      if(result){session=null;timer=null;localStorage.removeItem(resumeKey);showHome();hooks.changed?.();}
+      else showStep();
+      return;
     }
+    if(button.hasAttribute('data-stretch-previous'))return move('previous');
+    const step=session.steps[session.position];
+    if(!step)return;
+    if(button.hasAttribute('data-stretch-hold')){timer=null;startTimer(stretchExercise(step.id,session.settings).seconds,'Удержание растяжки',holdMessage);}
+    if(button.hasAttribute('data-stretch-next'))await move('next');
+    if(button.hasAttribute('data-stretch-skip'))await move('skip');
   });
 
   return {
-    start,
+    start,suspend,resume:()=>session&&showStep(),
+    get current(){return session?.day;},
+    sync(days){
+      const day=days.find(item=>item.id===session?.day?.id);
+      if(!day||saving||session.day.local)return;
+      if(day.finished_at){session=null;timer=null;localStorage.removeItem(resumeKey);if(active)showHome();return;}
+      if(day.stretch_revision!==(session.day.stretch_revision||0)){bindDay(day);timer=null;persist();if(active)showStep();}
+    },
     get filters() { return {group, query}; },
     filterCatalog({group: nextGroup = group, query: nextQuery = query}) {
       group = nextGroup;

@@ -50,11 +50,11 @@ export function dayMarkup(data,date) {
  const label=formatDate(date,shortDate);
  const sessionPlan=session||plan;
  const future=date>today();
- const start=sessionPlan&&!future&&(!session?.finished_at||(session.stretch_ids||[]).length);
- const actionLabel=session?.finished_at?'Открыть растяжку':session?'Продолжить':sessionPlan?.items.length?'Начать тренировку':'Начать растяжку';
+ const start=sessionPlan&&!future;
+ const actionLabel=session?.finished_at?'Посмотреть результат':session?'Продолжить':sessionPlan?.items.length?'Начать тренировку':'Начать растяжку';
  const intro=`<div class="day-summary">
   <div><span class="eyebrow">${date===today()?'СЕГОДНЯ':'ПЛАН ДНЯ'}</span><h2 id="day-title" tabindex="-1">${label}</h2>
-  <p>${items.length||stretchIds.length?`${items.length} силовых · ${stretchIds.length} на растяжку`:'День свободен. Добавьте упражнения из библиотеки.'}${session?.finished_at?' · Выполнено':''}</p></div>
+  <p>${items.length||stretchIds.length?`${items.length} силовых · ${stretchIds.length} на растяжку`:'День свободен. Добавьте упражнения из библиотеки.'}${session?.finished_at?(session.result_status==='partial'?' · Частично выполнено':' · Выполнено'):''}</p></div>
   ${start?`<button class="button primary flow-primary" data-day-start data-workout-plan="${esc(sessionPlan.plan_id||sessionPlan.id)}" data-workout-date="${date}" ${session?.finished_at?'':'data-write'}>${icon('play')} ${actionLabel}</button>`:''}
  </div>
  <p class="day-note">${session&&!session.finished_at?'Начатое занятие продолжится с прежними упражнениями и нагрузкой. Изменения плана применятся к следующим занятиям.':'Состав и нагрузка этого дня повторяются каждую неделю.'}</p>
@@ -63,7 +63,7 @@ export function dayMarkup(data,date) {
   <button class="button secondary" data-day-catalog="stretch">+ Растяжка</button>
  </div>`;
  const lists=`${items.length?`<section class="day-list"><h3>Силовые упражнения</h3><div class="day-library">${items.map(strengthTile).join('')}</div></section>`:''}
- ${stretchIds.length?`<section class="day-list"><div class="section-heading"><h3>Растяжка</h3>${items.length?`<button class="button quiet" data-day-stretch-preview>Открыть растяжку →</button>`:''}</div><div class="day-library">${stretchIds.map(id=>stretchTile(id,plan.stretch_settings)).join('')}</div></section>`:''}`;
+ ${stretchIds.length?`<section class="day-list"><div class="section-heading"><h3>Растяжка</h3>${items.length&&!future?`<button class="button quiet" data-day-stretch-preview data-write>Начать растяжку дня →</button>`:''}</div><div class="day-library">${stretchIds.map(id=>stretchTile(id,plan.stretch_settings)).join('')}</div></section>`:''}`;
  return {intro,lists};
 }
 

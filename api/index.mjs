@@ -3,6 +3,9 @@ import {attachDatabasePool} from '@neon/functions';
 import {randomUUID} from 'node:crypto';
 import {InputError,dateValue,planValue,scheduleValue,dayEdit,editDayItems,daySettings,editDaySettings,progress} from './model.mjs';
 import {passwordMatches,issueAccess,validAccess} from './access.mjs';
+import {separateSides,advanceStretch,sessionResult} from '../src/session-progress.js';
+import {stretchById} from '../src/stretch-catalog.js';
+import {doseValue} from '../src/day-settings.js';
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:10000,idleTimeoutMillis:20000});
 attachDatabasePool(pool);pool.on('error',()=>console.error('Database pool error'));
 const allowed=new Set(['https://juligym.mg-trener.com','https://mg-trener.github.io','http://127.0.0.1:4173','http://localhost:4173']);
@@ -21,7 +24,7 @@ async function ensureSession(c,date,planId){
  if(existing)return existing;
  const plan=(await c.query('SELECT * FROM juli_plans WHERE id=$1',[planId])).rows[0];if(!plan)throw new InputError('Комплекс не найден.',404);
  if(!plan.items.length&&!plan.stretch_ids.length)throw new InputError('Сначала добавьте упражнения.');
- await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items,stretch_ids,stretch_settings) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workout_date,plan_id) DO NOTHING',[randomUUID(),date,planId,plan.title,JSON.stringify(plan.items),JSON.stringify(plan.stretch_ids),JSON.stringify(plan.stretch_settings)]);
+ await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items,stretch_ids,stretch_settings) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workout_date,plan_id) DO NOTHING',[randomUUID(),date,planId,plan.title,JSON.stringify(plan.items.map(item=>({...item,sideMode:separateSides(item)?'separate':'together'}))),JSON.stringify(plan.stretch_ids),JSON.stringify(plan.stretch_settings)]);
  return (await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2 FOR UPDATE',[date,planId])).rows[0];
 }
 async function changeDay(c,edit){
@@ -61,7 +64,7 @@ export default {async fetch(request){
   if(!validAccess(request.headers.get('authorization'),process.env.DATABASE_URL))throw new InputError('Введите пароль, чтобы открыть дневник.',401);
   if(request.method==='GET' && route==='/state'){
    const from=dateValue(url.searchParams.get('from')),to=dateValue(url.searchParams.get('to'));if(Date.parse(to)-Date.parse(from)>42*86400000 || from>to)throw new InputError('Период — не более 42 дней.');
-   const [plans,schedule,sessions,history]=await Promise.all([pool.query("SELECT * FROM juli_plans ORDER BY CASE id WHEN 'legs' THEN 0 WHEN 'upper' THEN 1 WHEN 'core' THEN 2 ELSE 3 END,created_at,id"),pool.query('SELECT * FROM juli_schedule WHERE id=1'),pool.query('SELECT * FROM juli_sessions WHERE workout_date BETWEEN $1 AND $2 ORDER BY workout_date',[from,to]),pool.query('SELECT id,workout_date,plan_id,title,started_at,finished_at,duration_seconds FROM juli_sessions WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 200')]);
+   const [plans,schedule,sessions,history]=await Promise.all([pool.query("SELECT * FROM juli_plans ORDER BY CASE id WHEN 'legs' THEN 0 WHEN 'upper' THEN 1 WHEN 'core' THEN 2 ELSE 3 END,created_at,id"),pool.query('SELECT * FROM juli_schedule WHERE id=1'),pool.query('SELECT * FROM juli_sessions WHERE workout_date BETWEEN $1 AND $2 ORDER BY workout_date',[from,to]),pool.query('SELECT id,workout_date,plan_id,title,started_at,finished_at,duration_seconds,result_status,result_summary FROM juli_sessions WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 200')]);
    return reply({plans:plans.rows,schedule:schedule.rows[0],sessions:sessions.rows.map(serialize),history:history.rows.map(serialize),serverTime:new Date().toISOString()});
   }
   if(request.method!=='POST')throw new InputError('Неизвестный адрес.',404);
@@ -83,17 +86,48 @@ export default {async fetch(request){
   }
   const date=dateValue(body.date);const currentDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Qyzylorda'});if(date>currentDate)throw new InputError('Будущие дни доступны только для планирования.');if(!/^[a-zA-Z0-9-]{1,50}$/.test(body.planId||''))throw new InputError('Выберите комплекс.');
   const result=await transaction(async c=>{
+   if(route==='/stretch-start'){
+    if(!/^stretch-[0-9a-f-]{36}$/i.test(body.planId)||typeof body.title!=='string'||body.title.trim().length<2||body.title.length>70||!Array.isArray(body.ids)||!body.ids.length||body.ids.length>20||new Set(body.ids).size!==body.ids.length||body.ids.some(id=>!Object.hasOwn(stretchById,id)))throw new InputError('Проверьте подборку растяжки.');
+    const settings={};
+    for(const id of body.ids)if(body.settings?.[id]){
+     const field=stretchById[id].seconds?'seconds':'repetitions';
+     try{settings[id]={[field]:doseValue(id,field,body.settings[id][field])};}catch(e){throw new InputError(e.message);}
+    }
+    await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items,stretch_ids,stretch_settings) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workout_date,plan_id) DO NOTHING',[body.planId.slice(8),date,body.planId,body.title.trim(),'[]',JSON.stringify(body.ids),JSON.stringify(settings)]);
+    return (await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2',[date,body.planId])).rows[0];
+   }
    const session=await ensureSession(c,date,body.planId);
    if(route==='/start')return session;
+   if(route==='/stretch-progress'){
+    if(session.finished_at)throw new InputError('Занятие уже сохранено.',409);
+    if(!['next','previous','skip'].includes(body.action)||!session.stretch_ids.length)throw new InputError('Некорректный шаг растяжки.');
+    if(!/^[0-9a-f-]{36}$/i.test(body.opId||''))throw new InputError('Некорректная операция.');
+    const inserted=await c.query('INSERT INTO juli_operations(id,session_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id',[body.opId,session.id]);
+    if(!inserted.rowCount)return session;
+    if(body.revision!==session.stretch_revision)throw new InputError('Растяжка изменена в другом окне. Откройте занятие заново, чтобы продолжить с сохранённого шага.',409);
+    const next=advanceStretch(session.stretch_ids,session.stretch_state,body.action);
+    return (await c.query('UPDATE juli_sessions SET stretch_state=$1,stretch_revision=stretch_revision+1 WHERE id=$2 RETURNING *',[JSON.stringify(next),session.id])).rows[0];
+   }
    if(route==='/sets'){
     if(session.finished_at)throw new InputError('Завершённое занятие сохранено в истории.',409);
     const item=session.items.find(e=>e.id===body.exerciseId);if(!item||!Number.isInteger(body.setIndex)||body.setIndex<0||body.setIndex>=item.sets||typeof body.done!=='boolean'||!/^\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b$/i.test(body.opId||''))throw new InputError('Некорректная отметка подхода.');
     const inserted=await c.query('INSERT INTO juli_operations(id,session_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id',[body.opId,session.id]);
-    if(inserted.rowCount){const key=`${item.id}:${body.setIndex}`;session.marks={...session.marks,[key]:body.done};return (await c.query('UPDATE juli_sessions SET marks=$1 WHERE id=$2 RETURNING *',[JSON.stringify(session.marks),session.id])).rows[0];}return session;
+    if(body.side!==undefined&&(!separateSides(item)||![1,2].includes(body.side)))throw new InputError('Проверьте сторону упражнения.');
+    if(inserted.rowCount){
+     const key=`${item.id}:${body.setIndex}`;session.marks={...session.marks};
+     if(body.side){
+      if(session.marks[key]===true){session.marks[`${key}:1`]=true;session.marks[`${key}:2`]=true;}
+      delete session.marks[key];session.marks[`${key}:${body.side}`]=body.done;
+     }else{session.marks[key]=body.done;delete session.marks[`${key}:1`];delete session.marks[`${key}:2`];}
+     return (await c.query('UPDATE juli_sessions SET marks=$1 WHERE id=$2 RETURNING *',[JSON.stringify(session.marks),session.id])).rows[0];
+    }return session;
    }
    if(route==='/finish'){
-    if(session.finished_at)return session;const p=progress(session);if(p.done!==p.total||(!p.total&&!session.stretch_ids.length))throw new InputError('Сначала отметьте все подходы.');
-    return (await c.query('UPDATE juli_sessions SET finished_at=now(),duration_seconds=LEAST(28800,GREATEST(0,EXTRACT(EPOCH FROM (now()-started_at))::integer)) WHERE id=$1 RETURNING *',[session.id])).rows[0];
+    if(session.finished_at)return session;
+    const result=sessionResult(session);
+    if(!result.worked)throw new InputError('Сначала отметьте выполненный подход или сторону растяжки.');
+    if(result.status!=='completed'&&body.allowPartial!==true)throw new InputError('Не всё выполнено. Продолжите занятие или сохраните частичный результат.');
+    return (await c.query('UPDATE juli_sessions SET finished_at=now(),result_status=$2,result_summary=$3,duration_seconds=LEAST(28800,GREATEST(0,EXTRACT(EPOCH FROM (now()-started_at))::integer)) WHERE id=$1 RETURNING *',[session.id,result.status,JSON.stringify(result)])).rows[0];
    }
    throw new InputError('Неизвестный адрес.',404);
   });return reply({session:serialize(result)});

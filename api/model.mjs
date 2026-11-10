@@ -1,3 +1,4 @@
+import {strengthProgress} from '../src/session-progress.js';
 import {byId} from '../src/catalog.js';
 import {stretchById} from '../src/stretch-catalog.js';
 import {doseValue} from '../src/day-settings.js';
@@ -60,4 +61,4 @@ export const defaultPlans=[
  {id:'upper',title:'Верх тела',subtitle:'Спина, грудь, плечи и руки',ids:['back01','chest01','shoulders01','back08','arms01','arms06']},
  {id:'core',title:'Кор и спина',subtitle:'Контроль корпуса и осанка',ids:['core06','back09','glutes10','core04','core03','glutes01']}
 ].map(({ids,...p})=>({...p,items:ids.map(id=>({id,sets:2,reps:byId[id].reps,rest:byId[id].rest}))}));
-export function progress(session){const total=session.items.reduce((n,e)=>n+e.sets,0),done=session.items.reduce((n,e)=>n+Array.from({length:e.sets},(_,i)=>!!session.marks?.[`${e.id}:${i}`]).filter(Boolean).length,0);return {total,done,percent:total?Math.round(done/total*100):0};}
+export function progress(session){const {total,done,percent}=strengthProgress(session);return {total,done,percent};}

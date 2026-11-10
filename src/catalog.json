@@ -780,7 +780,8 @@
     "cue": "Удерживая таз ровно, немного отведите одно колено в сторону. Стопа остаётся на полу.",
     "easier": "Начните без веса, с опорой или с меньшей амплитудой.",
     "spec": "Supine bridge hips modestly lifted, open one bent knee slightly without pelvic tilt then return to bridge. Highlight glutes. Movement sequence: start supine hips on mat knees bent feet flat, middle lift pelvis shoulders hips knees aligned, end hips back on mat. Exercise-specific instructions take precedence over generic sequence.",
-    "advanced": false
+    "advanced": false,
+    "alternating": true
   },
   {
     "id": "glutes12",
@@ -874,7 +875,7 @@
     "rest": 60,
     "sets": 2,
     "unit": "reps",
-    "unilateral": false,
+    "unilateral": true,
     "phases": [
       "Наклон и опора",
       "Тяга к тазу",
@@ -1873,7 +1874,7 @@
     "rest": 45,
     "sets": 2,
     "unit": "reps",
-    "unilateral": false,
+    "unilateral": true,
     "phases": [
       "Устойчивая опора",
       "Разогните локоть",
@@ -2211,7 +2212,8 @@
     "cue": "Поверните грудную клетку к противоположному колену, другую ногу вытяните в посильной амплитуде.",
     "easier": "Начните без веса, с опорой или с меньшей амплитудой.",
     "spec": "Slow supine bicycle crunch, start knees bent90degrees hands lightly at ears, middle shoulder lifts and rotates toward opposite bent knee while other leg extends HIGH to avoid lumbar arch, end both knees bent and head down. Highlight obliques rectus abs. Movement sequence: start supine knees90degrees over hips arms vertical, middle extend opposite arm and leg a little keeping lower back stable, end return to arms up knees bent. Exercise-specific instructions take precedence over generic sequence.",
-    "advanced": false
+    "advanced": false,
+    "alternating": true
   },
   {
     "id": "core06",
@@ -2238,7 +2240,8 @@
     "cue": "Медленно вытяните противоположные руку и ногу, не усиливая прогиб.",
     "easier": "Уменьшите амплитуду и выполните меньше повторений.",
     "spec": "Dead bug supine arms up knees90degrees, middle opposite arm and leg extend at45degrees with lower back controlled, end return knees90arms up. Highlight abs. Movement sequence: start supine knees90degrees over hips arms vertical, middle extend opposite arm and leg a little keeping lower back stable, end return to arms up knees bent. Exercise-specific instructions take precedence over generic sequence.",
-    "advanced": false
+    "advanced": false,
+    "alternating": true
   },
   {
     "id": "core07",
@@ -2319,7 +2322,8 @@
     "cue": "Медленно подтяните одно колено, не прыгая.",
     "easier": "Начните без веса, с опорой или с меньшей амплитудой.",
     "spec": "Slow mountain climber high plank palms under shoulders bring one knee to chest without jumping, then return. Highlight abs shoulders. Movement sequence: start high plank palms under shoulders feet on mat, middle slowly bring one knee toward chest pelvis level, end foot back to start. Exercise-specific instructions take precedence over generic sequence.",
-    "advanced": false
+    "advanced": false,
+    "alternating": true
   },
   {
     "id": "core10",

@@ -47,6 +47,7 @@ const stretchOnly={date:'2001-03-08',planId:'weekday-3'};
 const stretchSession=(await call('start',stretchOnly)).session;
 assert.equal(stretchSession.items.length,0);
 assert.deepEqual(stretchSession.stretch_ids,['stretch-sphinx']);
+if(!stretchSession.finished_at){await call('finish',stretchOnly,400);await call('stretch-progress',{...stretchOnly,revision:stretchSession.stretch_revision,action:'next',opId:randomUUID()});}
 assert.ok((await call('finish',stretchOnly)).session.finished_at);
 await edit(3,'stretch-sphinx',false);
 console.log('PASS: Neon persistence, concurrent weekly edits and marks, duplicate safety, immutable strength and stretch snapshots, revision conflicts, calendar completion, validation and CORS.');

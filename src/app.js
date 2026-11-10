@@ -1,3 +1,4 @@
+import {separateSides,setDone,sideDone,sessionResult,stretchProgress,advanceStretch,stretchSteps} from './session-progress.js';
 import {exercises,groups,byId} from './catalog.js';
 import {icon,anatomy} from './icons.js';
 import {today,addDays,weekStart,dayIndex,summary,estimatedMinutes,formatDate,firstPendingSet,plannedWorkout,sessionForDate,escape as esc} from './state.js';
@@ -6,13 +7,38 @@ import {isUnlocked,lockAccess} from './access.js';
 import {startTimer,stopTimer,keepAwake} from './timer.js';
 import {initStretch} from './stretch.js';
 import {stretches,stretchById} from './stretch-catalog.js';
-import {todayMarkup,guidedMarkup} from './workout-flow.js';
+import {todayMarkup,guidedMarkup,finishChoice} from './workout-flow.js';
 import {dayMarkup,dayEditButton,catalogMarkup,catalogGroupOptions} from './week-plan.js';
 import {createDayAutosave} from './day-autosave.js';
 const $=s=>document.querySelector(s),days=['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
 let openTechnique=null;
-const stretch=initStretch($('#stretch-view'),()=>openTechnique);
-let data={plans:[],schedule:{weekdays:{},revision:1},sessions:[],history:[]},selectedDate=today(),week=weekStart(today()),selectedPlan='legs',view='day',group='all',query='',mobileSidebar=false,busy=false,online=false,editingId=null,editorItems=[],loadNumber=0;
+const stretch=initStretch($('#stretch-view'),()=>openTechnique,{
+ changed:()=>render(),
+ start:async body=>{
+  if(!online)return {id:body.planId.slice(8),plan_id:body.planId,workout_date:body.date,title:body.title,items:[],marks:{},stretch_ids:body.ids,stretch_settings:body.settings,stretch_state:{position:0,marks:{}},stretch_revision:0,local:true,localActions:[]};
+  const result=await mutate('stretch-start',body);if(result)render();return result?.session;
+ },
+ save:async (day,action)=>{
+  if(day.local)return {...day,stretch_state:advanceStretch(day.stretch_ids,day.stretch_state,action),stretch_revision:day.stretch_revision+1,localActions:[...day.localActions,{action,opId:crypto.randomUUID()}]};
+  const result=await mutate('stretch-progress',{date:day.workout_date,planId:day.plan_id,revision:day.stretch_revision||0,action,opId:crypto.randomUUID()});
+  if(result)render();
+  else {await load(true);const fresh=data.sessions.find(item=>item.id===day.id);if(fresh?.stretch_revision!==day.stretch_revision)return fresh;}
+  return result?.session;
+ },
+ finish:async day=>{
+  if(day.local){
+   if(!online){notify('Шаги сохранены на устройстве. Подключитесь к интернету, чтобы добавить результат в общий дневник.',true);return null;}
+   let result=await mutate('stretch-start',{date:day.workout_date,planId:day.plan_id,title:day.title,ids:day.stretch_ids,settings:day.stretch_settings});
+   if(!result)return null;
+   for(const [revision,operation] of day.localActions.entries()){
+    result=await mutate('stretch-progress',{date:day.workout_date,planId:day.plan_id,revision,...operation});
+    if(!result)return null;
+   }
+  }
+  return finishDayStretch(day.workout_date,day.plan_id);
+ }
+});
+let data={plans:[],schedule:{weekdays:{},revision:1},sessions:[],history:[]},selectedDate=today(),week=weekStart(today()),selectedPlan='legs',view='today',group='all',query='',mobileSidebar=false,busy=false,online=false,editingId=null,editorItems=[],loadNumber=0;
 let loadedWeek=null, guidedKey=null, todayHtml=null, strengthView='day';
 let dayCatalogOpen=false, dayMode='strength', imageExercise=null;
 const plural=(n,a,b,c)=>n%100>=11&&n%100<=14?c:n%10===1?a:n%10>=2&&n%10<=4?b:c;
@@ -38,7 +64,7 @@ const narrow=matchMedia('(max-width:1000px)');
 function closeSidebar(focus=false){mobileSidebar=false;document.body.classList.remove('sidebar-open');$('#menu-open').setAttribute('aria-expanded','false');$('.sidebar').inert=narrow.matches;$('#main').inert=false;$('.mobile-nav').inert=false;if(focus)$('#menu-open').focus();}
 narrow.addEventListener('change',()=>closeSidebar());
 closeSidebar();
-const selected=()=>data.plans.find(p=>p.id===selectedPlan)||data.plans[0];
+const selected=()=>data.plans.find(p=>p.id===selectedPlan);
 const currentSession=()=>data.sessions.find(s=>s.workout_date===selectedDate && s.plan_id===selectedPlan);
 const currentItems=()=>currentSession()?.items||selected()?.items||[];
 function notify(message,error=false){const box=$('#toast');box.textContent=message;box.classList.toggle('error',error);box.hidden=false;clearTimeout(ui.toast);ui.toast=setTimeout(()=>box.hidden=true,5000);}
@@ -56,11 +82,12 @@ async function load(silent=false){
   const next=await request(`state?from=${addDays(requestedWeek,-7)}&to=${addDays(requestedWeek,6)}`);
   if(token!==loadNumber)return;
   data=next;
+  stretch.sync(data.sessions);
   doseSaves.clearSaved();
   loadedWeek=requestedWeek;
   cacheDiary();
   setConnection(true);
-  if(!data.plans.some(p=>p.id===selectedPlan))selectedPlan=data.plans[0]?.id;
+  if(!data.plans.some(p=>p.id===selectedPlan)&&!data.sessions.some(s=>s.plan_id===selectedPlan))selectedPlan=data.plans[0]?.id;
   render();
  }catch(e){
   if(token!==loadNumber)return;
@@ -86,8 +113,7 @@ async function mutate(path,body){
    if(index<0)data.sessions.push(session);
    else data.sessions[index]=session;
    if(session.finished_at&&!data.history.some(entry=>entry.id===session.id)){
-    const {id,workout_date,plan_id,title,started_at,finished_at,duration_seconds}=session;
-    data.history.unshift({id,workout_date,plan_id,title,started_at,finished_at,duration_seconds});
+    data.history.unshift(session);
    }
    cacheDiary();
   }
@@ -113,7 +139,7 @@ function renderBusy(){
   if(button.hasAttribute('data-day-start'))disabled ||= loadedWeek!==weekStart(view==='today'?today():button.dataset.workoutDate);
   if(button.hasAttribute('data-day-start'))disabled ||= [...doseSaves.entries.values()].some(entry=>entry.body.weekday===dayIndex(button.dataset.workoutDate)&&entry.state!=='saved');
   if(button.hasAttribute('data-set')||button.hasAttribute('data-guided-set'))disabled ||= future||!!session?.finished_at;
-  if(button.id==='finish-workout'||button.id==='guided-finish')disabled ||= future||!session||!!session.finished_at||!progress.total||progress.done!==progress.total;
+  if(button.id==='finish-workout'||button.id==='guided-finish')disabled ||= future||!session||!!session.finished_at||!sessionResult(session).worked;
   button.disabled=disabled;
  });
  document.querySelectorAll('[data-dose]').forEach(field=>field.disabled=!online||(busy&&!savingDose));
@@ -146,14 +172,15 @@ function sidebar(){
 }
 function renderWeek(){
  const finished=new Set(data.history.filter(h=>h.workout_date>=week&&h.workout_date<=addDays(week,6)).map(h=>h.workout_date));
- const active=new Set(data.sessions.filter(s=>summary(s).done>0).map(s=>s.workout_date));
+ const partial=new Set(data.history.filter(h=>h.result_status==='partial').map(h=>h.workout_date));
+ const active=new Set(data.sessions.filter(s=>sessionResult(s).worked>0).map(s=>s.workout_date));
  $('#week-stat').textContent=`7 дней · ${Object.keys(data.schedule?.weekdays||{}).length} тренировочных дня · ${finished.size} завершено`;
  $('#week-range').textContent=`${formatDate(week,{day:'numeric',month:'short'})} — ${formatDate(addDays(week,6),{day:'numeric',month:'short'})}`;
- $('#week-days').innerHTML=days.map((label,i)=>{const date=addDays(week,i),isToday=date===today(),done=finished.has(date),planned=data.schedule?.weekdays?.[i];return `<button data-date="${date}" class="week-day ${date===selectedDate?'selected':''} ${isToday?'today':''} ${done?'completed':''}" aria-pressed="${date===selectedDate}" aria-label="${formatDate(date)}${done?', тренировка выполнена':planned?', тренировка запланирована':', отдых'}"><span>${label}</span><small>${formatDate(date,{day:'numeric',month:'short'})}</small><span class="day-marker">${done?icon('check'):isToday?icon('flame'):active.has(date)?'<i></i>':''}</span><em>${isToday?'Сегодня':done?'Готово':planned?'По плану':'Отдых'}</em></button>`;}).join('');
+ $('#week-days').innerHTML=days.map((label,i)=>{const date=addDays(week,i),isToday=date===today(),done=finished.has(date),planned=data.schedule?.weekdays?.[i];return `<button data-date="${date}" class="week-day ${date===selectedDate?'selected':''} ${isToday?'today':''} ${done?'completed':''}" aria-pressed="${date===selectedDate}" aria-label="${formatDate(date)}${done?(partial.has(date)?', частично выполнено':', тренировка выполнена'):planned?', тренировка запланирована':', отдых'}"><span>${label}</span><small>${formatDate(date,{day:'numeric',month:'short'})}</small><span class="day-marker">${done?(partial.has(date)?'◐':icon('check')):isToday?icon('flame'):active.has(date)?'<i></i>':''}</span><em>${done?(partial.has(date)?'Частично':'Готово'):isToday?'Сегодня':planned?'По плану':'Отдых'}</em></button>`;}).join('');
 }
 function renderPlans(){
  const plans=data.plans.filter(plan=>!plan.id.startsWith('weekday-')||plan.id===selectedPlan);
- $('#plans').innerHTML=plans.map(plan=>{const sess=data.sessions.find(s=>s.plan_id===plan.id&&s.workout_date===selectedDate),p=summary(sess||{items:plan.items,marks:{}}),g=byId[plan.items[0]?.id]?.group||'all';return `<button data-plan="${plan.id}" class="plan-card ${plan.id===selectedPlan?'active':''}" aria-pressed="${plan.id===selectedPlan}"><span class="plan-badge">${sess?.finished_at?'ВЫПОЛНЕНО':plan.id===selectedPlan?'АКТИВНАЯ':'ПОДБОРКА'}</span><h3>${esc(plan.title)}</h3><p>${plan.items.length} ${exerciseWord(plan.items.length)} · ≈ ${estimatedMinutes(plan)} мин</p><div class="progress-line"><span style="width:${p.percent}%"></span></div><div class="plan-percent"><span>${sess?.finished_at?'Сохранено в дневнике':p.done?`${p.done} из ${p.total} подходов`:'Запланировано'}</span><strong>${p.percent}%</strong></div>${anatomy(g,'plan-anatomy')}<span class="plan-action">${plan.id===selectedPlan?'К упражнениям':'Открыть'} ${icon('arrow')}</span></button>`;}).join('');
+ $('#plans').innerHTML=plans.map(plan=>{const sess=data.sessions.find(s=>s.plan_id===plan.id&&s.workout_date===selectedDate),p=summary(sess||{items:plan.items,marks:{}}),g=byId[plan.items[0]?.id]?.group||'all';return `<button data-plan="${plan.id}" class="plan-card ${plan.id===selectedPlan?'active':''}" aria-pressed="${plan.id===selectedPlan}"><span class="plan-badge">${sess?.finished_at?(sess.result_status==='partial'?'ЧАСТИЧНО':'ВЫПОЛНЕНО'):plan.id===selectedPlan?'АКТИВНАЯ':'ПОДБОРКА'}</span><h3>${esc(plan.title)}</h3><p>${plan.items.length} ${exerciseWord(plan.items.length)} · ≈ ${estimatedMinutes(plan)} мин</p><div class="progress-line"><span style="width:${p.percent}%"></span></div><div class="plan-percent"><span>${sess?.finished_at?'Сохранено в дневнике':p.done?`${p.done} из ${p.total} подходов`:'Запланировано'}</span><strong>${p.percent}%</strong></div>${anatomy(g,'plan-anatomy')}<span class="plan-action">${plan.id===selectedPlan?'К упражнениям':'Открыть'} ${icon('arrow')}</span></button>`;}).join('');
 }
 function exerciseCard(item,index,kind='exercise'){
  const e=byId[item.id];
@@ -163,9 +190,9 @@ function exerciseCard(item,index,kind='exercise'){
  const guided=kind==='guided';
  const cardId=`${kind}-${e.id}`;
  const sets=item.sets||2;
- const count=Array.from({length:sets},(_,i)=>marks[`${e.id}:${i}`]===true).filter(Boolean).length;
+ const count=Array.from({length:sets},(_,i)=>setDone(session,item,i)).filter(Boolean).length;
  const complete=count===sets&&!library&&!guided;
- const dose=`${esc(item.reps||e.reps)}${e.unit==='seconds'?'':' повторов'}${e.unilateral?' · на сторону':''}`;
+ const dose=`${esc(item.reps||e.reps)}${e.unit==='seconds'?'':' повторов'}${e.unilateral?(e.alternating?' · на сторону, чередуя':' · на сторону'):''}`;
  const rest=item.rest||e.rest;
  const meta=guided ? `<div class="guided-meta"><strong>${dose}</strong><span>${esc(e.equipment)}</span><span>Отдых ${rest} с</span></div>` : `
   <div class="exercise-meta">
@@ -175,11 +202,11 @@ function exerciseCard(item,index,kind='exercise'){
   </div>`;
  let actions='';
  if(library)actions=dayEditButton(e.id,inDay(e.id));
- if(!library&&!guided)actions=`<div class="set-buttons">${Array.from({length:sets},(_,i)=>{
-  const key=`${e.id}:${i}`;
-  const marked=marks[key]===true;
-  return `<button class="set-button ${marked?'done':''}" data-set="${key}" data-write aria-pressed="${marked}" ${session?.finished_at?'disabled':''}>${marked?icon('check'):''}Подход ${i+1}${marked?' ✓':''}</button>`;
- }).join('')}</div>`;
+ if(!library&&!guided)actions=`<div class="set-buttons">${Array.from({length:sets},(_,i)=>(separateSides(item)?[1,2]:[0]).map(side=>{
+  const key=`${e.id}:${i}${side?':'+side:''}`;
+  const marked=side?sideDone(session,item,i,side):setDone(session,item,i);
+  return `<button class="set-button ${marked?'done':''}" data-set="${key}" data-write aria-pressed="${marked}" ${session?.finished_at?'disabled':''}>${marked?icon('check'):''}Подход ${i+1}${side?' · '+(side===1?'левая':'правая'):''}</button>`;
+ }).join('')).join('')}</div>`;
  return `<article class="exercise-card ${complete?'is-complete':''}" id="${cardId}">
   <header><div><h3>${kind==='exercise'?`<span class="exercise-number">${index+1}</span>`:''}${e.title}</h3><p>${e.muscles}</p></div><span class="difficulty ${e.advanced?'advanced':''}">${e.level}</span>${complete?`<span class="complete-icon">${icon('check')}</span>`:''}</header>
   <button class="exercise-art" data-image="${e.id}" aria-label="Увеличить: ${e.title}, три фазы"><img src="./media/${e.id}.webp" alt="Юля: ${e.title}. Коралловым выделены ${e.muscles.toLowerCase()}." width="1536" height="1024" loading="${guided||index<2?'eager':'lazy'}"><span class="art-zoom">↗</span></button>
@@ -197,7 +224,8 @@ function renderWorkout(){
  $('#workout-progress').innerHTML=`<div><span>Прогресс тренировки</span><span>${p.complete} / ${items.length} упражнений</span></div><div class="progress-line"><span style="width:${p.percent}%"></span></div><p>${icon(session?.finished_at?'check':'clock')}${session?.finished_at?'Занятие завершено и сохранено в общем дневнике.':p.done?`${p.percent}% · ${p.done} из ${p.total} подходов`:'Начните с разминки и двигайтесь в своём темпе.'}</p>`;
  $('#exercises').innerHTML=items.map((item,i)=>exerciseCard(item,i)).join('')||`<p class="empty">${stretchIds.length?'В этом занятии только растяжка.':'Создайте подборку из библиотеки.'}</p>`;
 
- $('#session-actions').innerHTML=`${session?.finished_at?`<div class="session-saved">${icon('check')} Тренировка выполнена · ${formatDate(selectedDate)}<span>${Math.max(1,Math.round(session.duration_seconds/60))} мин</span></div>`:`<button class="button primary" id="finish-workout" data-write ${p.done!==p.total||!p.total?'disabled':''}>${icon('check')} Завершить тренировку</button><p>Завершите все подходы — занятие попадёт в историю, а день получит отметку ✓.</p>`}`;
+ $('#session-actions').innerHTML=session?.finished_at?`<div class="session-saved">${icon('check')} ${session.result_status==='partial'?'Частично выполнено':'Тренировка выполнена'} · ${formatDate(selectedDate)}<span>${items.length?`${p.done} / ${p.total} подходов`:''}${stretchIds.length&&session.result_summary?` · ${stretchProgress(session).done} / ${stretchProgress(session).total} шагов растяжки`:''}</span></div>`:session?`${sessionResult(session).status==='completed'?'<button class="button primary" id="finish-workout" data-write>Сохранить занятие</button>':finishChoice(session)}`:'<p>Начните занятие — выполненные подходы будут сохраняться сразу.</p>';
+ if(stretchIds.length&&session?.finished_at)$('#session-actions').innerHTML+=`<div class="stretch-result"><h3>Растяжка · результат</h3>${!session.result_summary?'<p>Сохранено ранее. Отдельные шаги растяжки тогда ещё не записывались.</p>':stretchSteps(stretchIds).map(step=>`<p>${session.stretch_state?.marks?.[step.key]==='done'?'✓':session.stretch_state?.marks?.[step.key]==='skipped'?'Пропущено':'Не отмечено'} · ${esc(stretchById[step.id].title)}${stretchById[step.id].unilateral?' · '+(step.side===1?'левая':'правая'):''}</p>`).join('')}</div>`;
  $('#training-start').innerHTML=icon('play')+(session?.finished_at?'Посмотреть занятие':session?'Продолжить':!items.length&&stretchIds.length?'Начать растяжку':'Начать тренировку');
  $('#edit-plan').disabled=!plan;
  $('#stretch-after').hidden=!items.length&&!stretchIds.length;
@@ -210,7 +238,7 @@ function renderLibrary(){
  $('#library-grid').innerHTML=filtered.map((e,i)=>exerciseCard(e,i,'library')).join('')||'<p class="empty">Ничего не найдено. Измените название или группу мышц.</p>';
 }
 function renderHistory(){
- $('#history-list').innerHTML=data.history.length?data.history.map(h=>`<button class="history-row" data-history-date="${h.workout_date}" data-history-plan="${h.plan_id}"><span class="history-check">${icon('check')}</span><span><strong>${esc(h.title)}</strong><small>${formatDate(h.workout_date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</small></span><span>${Math.max(1,Math.round(h.duration_seconds/60))} мин</span>${icon('chevron')}</button>`).join(''):'<div class="empty">Здесь появятся реальные завершённые занятия Юли.<br>Отметьте подходы и завершите тренировку.</div>';
+ $('#history-list').innerHTML=data.history.length?data.history.map(h=>`<button class="history-row" data-history-date="${h.workout_date}" data-history-plan="${h.plan_id}"><span class="history-check">${h.result_status==='partial'?'◐':icon('check')}</span><span><strong>${esc(h.title)}</strong><small>${formatDate(h.workout_date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · ${h.result_status==='partial'?'Частично выполнено':'Выполнено'}</small></span><span>${h.result_status==='partial'?'Частично':'Выполнено'}</span>${icon('chevron')}</button>`).join(''):'<div class="empty">Здесь появятся реальные завершённые занятия Юли.<br>Отметьте подходы и завершите тренировку.</div>';
  $('#history-total').textContent=data.history.length;
 }
 function inDay(id){
@@ -276,7 +304,7 @@ function render(){
  if(view==='history')renderHistory();
  if(view==='today'){
   $('#today-date').textContent=formatDate(today(),{weekday:'long',day:'numeric',month:'long'});
-  const html=todayMarkup(data,today());
+  const html=todayMarkup(data,today())+(stretch.current?.local?`<div class="today-card"><h3>Растяжка на этом устройстве</h3><p>${esc(stretch.current.title)} · шаг сохранён без интернета</p><button class="button primary" data-resume-local>Продолжить растяжку</button></div>`:'');
   if(html!==todayHtml){$('#today-content').innerHTML=html;todayHtml=html;}
  }
  if(view==='guided'){
@@ -290,8 +318,8 @@ function render(){
  }
  $('.week-section').hidden=['today','stretch','guided'].includes(view);
  document.querySelectorAll('[data-view-panel]').forEach(panel=>panel.hidden=panel.dataset.viewPanel!==view);
- document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-current',button.dataset.view===(view==='guided'?'workout':view)?'page':'false'));
- document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===activeMode())));
+ document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-current',button.dataset.view===(view==='guided'?'today':view)?'page':'false'));
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===(view==='stretch'?'stretch':'strength'))));
  if($('#image-dialog').open)updateImageAction();
  renderBusy();
 }
@@ -313,7 +341,7 @@ function openDayCatalog(mode=dayMode,focus=true){
  dayCatalogOpen=true;
  sidebar();
  renderDayCatalog();
- document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===dayMode)));
+ document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode==='strength')));
  renderBusy();
  if(!mobileSidebar){
   if(focus)$('#day-catalog-title').focus({preventScroll:true});
@@ -344,24 +372,20 @@ async function beginDay(date,planId){
  const plan=saved||data.plans.find(plan=>plan.id===planId);
  if(!plan||date>today())return;
  if(!saved?.finished_at){await beginGuided(date,planId);return;}
- if(!plan.stretch_ids?.length)return;
- selectedDate=date;
- selectedPlan=planId;
- setView('stretch');
- stretch.start(plan.title,plan.stretch_ids,undefined,plan.stretch_settings);
- renderBusy();
+ selectedDate=date;selectedPlan=planId;week=weekStart(date);setView('workout');
 }
 
 async function finishDayStretch(date,planId){
- const result=await mutate('finish',{date,planId});
- if(!result)return;
- stretch.openCatalog();
- if(view==='stretch'){selectedDate=date;week=weekStart(date);dayCatalogOpen=false;setView('day');}
- else render();
- notify('Растяжка сохранена. День отмечен в календаре.');
+ const result=await mutate('finish',{date,planId,allowPartial:true});
+ if(!result)return null;
+ stopTimer();keepAwake(false);render();
+ notify(result.session.result_status==='partial'?'Частичный результат сохранён. Сделанное тоже важно.':'Занятие сохранено. Отличная работа!');
+ setView('today');
+ return result.session;
 }
 
 function setView(next,closeMenu=true){
+ if(view!==next&&view==='stretch')stretch.suspend();
  if(view!==next&&(['stretch','guided'].includes(view)||['stretch','guided'].includes(next))){stopTimer();keepAwake(false);}
  if(view==='guided'&&next!=='guided')document.body.insertBefore($('#timer'),$('#toast'));
  if(view!=='guided'&&next==='guided')$('#guided-timer-slot').append($('#timer'));
@@ -387,7 +411,7 @@ async function beginGuided(date,planId){
  selectedDate=date;
  selectedPlan=planId;
  week=weekStart(date);
- if(!result.session.items.length&&result.session.stretch_ids?.length){
+ if(result.session.stretch_ids?.length&&(!result.session.items.length||(!firstPendingSet(result.session)&&!result.session.finished_at))){
   setView('stretch');
   stretch.start(result.session.title,result.session.stretch_ids,result.session.finished_at?undefined:result.session,result.session.stretch_settings);
   renderBusy();
@@ -398,35 +422,37 @@ async function beginGuided(date,planId){
 }
 
 async function markApproach(key,guided=false){
- const [exerciseId,index]=key.split(':');
+ const [exerciseId,index,sideValue]=key.split(':');
+ const side=sideValue?Number(sideValue):undefined;
  const session=currentSession();
  const date=selectedDate, planId=selectedPlan, originView=view;
  const item=currentItems().find(entry=>entry.id===exerciseId);
  if(!item||session?.finished_at||!online)return;
  if(guided){
   const pending=session&&firstPendingSet(session);
-  if(!pending||key!==`${pending.item.id}:${pending.setIndex}`)return;
+  if(!pending||key!==`${pending.item.id}:${pending.setIndex}${pending.side?':'+pending.side:''}`)return;
  }
- const done=guided||!session?.marks?.[key];
- const result=await mutate('sets',{date,planId,exerciseId,setIndex:Number(index),done,opId:crypto.randomUUID()});
+ const done=guided||!(side?sideDone(session,item,Number(index),side):setDone(session,item,Number(index)));
+ const result=await mutate('sets',{date,planId,exerciseId,setIndex:Number(index),side,done,opId:crypto.randomUUID()});
  if(!result){if(guided&&view==='guided')await load(true);return;}
  render();
  if(view!==originView||selectedDate!==date||selectedPlan!==planId)return;
  const progress=summary(result.session);
- if(done&&progress.done<progress.total)startTimer(item.rest);
+ if(done&&side===1){stopTimer();notify('Теперь правая сторона. Подход завершится после обеих сторон.');}
+ else if(done&&progress.done<progress.total)startTimer(item.rest);
  else if(guided)stopTimer();
  if(guided)focusGuided();
 }
 
 async function finishTraining(){
  const date=selectedDate, planId=selectedPlan, originView=view;
- const result=await mutate('finish',{date,planId});
+ const result=await mutate('finish',{date,planId,allowPartial:true});
  if(!result)return;
  const sameSession=view===originView&&selectedDate===date&&selectedPlan===planId;
  if(sameSession){stopTimer();keepAwake(false);}
  render();
  if(sameSession&&view==='guided')focusGuided();
- notify('Тренировка Юли сохранена. День отмечен в календаре.');
+ notify(result.session.result_status==='partial'?'Частичный результат сохранён. Сделанное тоже важно.':'Тренировка сохранена. День отмечен в календаре.');
  await load(true);
 }
 function openEditor(id=null){editingId=id;const plan=data.plans.find(p=>p.id===id);editorItems=(plan?.items||[]).map(i=>({...i}));$('#editor-title').textContent=id?'Изменить подборку':'Новая подборка';$('#plan-name').value=plan?.title||'';$('#editor-search').value='';renderEditor();$('#editor-dialog').showModal();}
@@ -440,8 +466,9 @@ function openSchedule(){
 document.addEventListener('click',async event=>{
  if(!isUnlocked())return;
  const hint=event.target.closest('.technique>summary');if(hint){event.preventDefault();const panel=hint.parentElement;openTechnique=panel.open?null:panel.dataset.technique;document.querySelectorAll('.technique').forEach(d=>d.open=d.dataset.technique===openTechnique);return;}
- if(event.target.closest('#lock-access')){stopTimer();keepAwake(false);lockAccess();return;}
+ if(event.target.closest('#lock-access')){stretch.suspend();stopTimer();keepAwake(false);lockAccess();return;}
  const b=event.target.closest('button');if(!b)return;
+ if(b.hasAttribute('data-resume-local')){setView('stretch');stretch.resume();return;}
  if(b.dataset.doseRetry){doseSaves.retry(dayIndex(selectedDate),b.dataset.doseRetry);return;}
  if(b.dataset.doseReset){doseSaves.discard(dayIndex(selectedDate),b.dataset.doseReset);ui.dayLists=null;render();return;}
  if(b.id==='day-stretch-routines'){stretch.openCatalog();setView('stretch');return;}
@@ -450,16 +477,21 @@ document.addEventListener('click',async event=>{
  if(b.hasAttribute('data-day-stretch-finish')){await finishDayStretch(b.dataset.workoutDate,b.dataset.workoutPlan);return;}
  if(b.hasAttribute('data-day-stretch-preview')){
   const plan=plannedWorkout(data,selectedDate);
-  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids,undefined,plan.stretch_settings);}
+  if(plan?.stretch_ids?.length&&selectedDate<=today()){
+   const result=await mutate('start',{date:selectedDate,planId:plan.id});
+   if(!result)return;
+   selectedPlan=plan.id;setView('stretch');
+   stretch.start(result.session.title,result.session.stretch_ids,result.session.finished_at?undefined:result.session,result.session.stretch_settings);
+  }
   return;
  }
  if(view==='day'){
-  if(b.dataset.dayCatalog||b.dataset.mode||['library','stretch'].includes(b.dataset.view)||b.id==='sidebar-create'){
+  if(b.dataset.dayCatalog||b.id==='sidebar-create'){
    closeSidebar();
    openDayCatalog(b.dataset.dayCatalog||b.dataset.mode||(b.dataset.view==='stretch'?'stretch':dayMode));
    return;
   }
-  if(b.dataset.group){
+  if(b.dataset.group&&dayCatalogOpen){
    closeSidebar();
    filterDay({group:b.dataset.group});
    openDayCatalog();
@@ -474,7 +506,8 @@ document.addEventListener('click',async event=>{
   }
  }
  if(b.dataset.mode){
-  const next=b.dataset.mode==='stretch'?'stretch':strengthView;
+  const next=b.dataset.mode==='stretch'?'stretch':'today';
+  if(next==='stretch')stretch.openCatalog();
   if(next==='day')dayMode='strength';
   if(next!==view)setView(next);
   return;
@@ -492,7 +525,7 @@ document.addEventListener('click',async event=>{
    revealStretchSection();
    return;
   }
-  if(b.dataset.view==='library'||b.id==='sidebar-create'){
+  if(b.id==='sidebar-create'){
    closeSidebar();
    revealStretchSection(b.id==='sidebar-create'?'#stretch-custom-title':'#stretch-library-title');
    return;
@@ -500,10 +533,10 @@ document.addEventListener('click',async event=>{
  }
  if(b.dataset.group){group=b.dataset.group;setView('library');}
  if(b.dataset.view==='day')dayCatalogOpen=false;
- if(b.dataset.view)setView(b.dataset.view);
+ if(b.dataset.view){if(b.dataset.view==='stretch')stretch.openCatalog();setView(b.dataset.view);}
  if(b.id==='stretch-after'||b.hasAttribute('data-workout-stretch')){
   const plan=currentSession()||selected();
-  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids,undefined,plan.stretch_settings);return;}
+  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids,plan.id&&plan.workout_date&&!plan.finished_at?plan:undefined,plan.stretch_settings);return;}
   stretch.recommend(currentItems().map(item=>byId[item.id]?.group));
   setView('stretch');
   $('#stretch-cooldown button').focus({preventScroll:true});
@@ -538,13 +571,13 @@ document.addEventListener('click',async event=>{
  if(b.dataset.set)await markApproach(b.dataset.set);
  if(b.dataset.guidedSet)await markApproach(b.dataset.guidedSet,true);
  if(b.dataset.guidedHold)startTimer(Number(b.dataset.guidedHold),'Удержание','Удержание завершено. Можно отметить подход.');
- if(b.id==='finish-workout'||b.id==='guided-finish')await finishTraining();
+ if(b.id==='finish-workout'||b.id==='guided-finish'||b.hasAttribute('data-finish-partial'))await finishTraining();
  if(b.dataset.rest)startTimer(Number(b.dataset.rest));
  if(b.dataset.image){const e=byId[b.dataset.image]||stretchById[b.dataset.image];imageExercise=e.id;$('#image-title').textContent=e.title;$('#image-large').src=`./media/${e.id}.webp`;$('#image-large').alt=`${e.title}: три фазы движения`;$('#image-steps').innerHTML=e.steps.map(s=>`<li>${s}</li>`).join('');$('#image-cue').textContent=e.cue;updateImageAction();renderBusy();$('#image-dialog').showModal();}
  if(b.hasAttribute('data-stretch-next')||b.hasAttribute('data-stretch-skip'))renderBusy();
  if(b.id==='menu-open'){mobileSidebar=!mobileSidebar;document.body.classList.toggle('sidebar-open',mobileSidebar);b.setAttribute('aria-expanded',String(mobileSidebar));$('.sidebar').inert=!mobileSidebar;$('#main').inert=mobileSidebar;$('.mobile-nav').inert=mobileSidebar;if(mobileSidebar)$('#brand').focus({preventScroll:true});}
  if(b.id==='sidebar-backdrop')closeSidebar(true);
- if(b.id==='settings-open')$('#settings-dialog').showModal();
+ if(b.id==='settings-open'||b.hasAttribute('data-settings-open')){closeSidebar();$('#settings-dialog').showModal();}
  if(b.id==='refresh-data')await load();
  if(b.id==='show-all-plans'){$('#plans').classList.toggle('all-plans');b.setAttribute('aria-expanded',String($('#plans').classList.contains('all-plans')));}
  if(b.dataset.historyDate){selectedDate=b.dataset.historyDate;week=weekStart(selectedDate);selectedPlan=b.dataset.historyPlan;await load();setView('workout');}
@@ -562,7 +595,7 @@ window.addEventListener('beforeunload',event=>{if(doseSaves.unsaved){event.preve
 document.addEventListener('change',event=>{const e=event.target;if(e.dataset.editorSets)editorItems.find(i=>i.id===e.dataset.editorSets).sets=Number(e.value);if(e.dataset.editorReps)editorItems.find(i=>i.id===e.dataset.editorReps).reps=e.value;if(e.dataset.editorRest)editorItems.find(i=>i.id===e.dataset.editorRest).rest=Number(e.value);});
 $('#search').addEventListener('input',event=>{
  const value=event.target.value;
- if(view==='day'){filterDay({query:value});return;}
+ if(view==='day'&&dayCatalogOpen){filterDay({query:value});return;}
  if(view==='stretch'){
   stretch.filterCatalog({query:value});
   if(!mobileSidebar)revealStretchSection('#stretch-library-title',false);
@@ -573,7 +606,7 @@ $('#search').addEventListener('input',event=>{
 });
 $('#library-search').addEventListener('submit',event=>{
  event.preventDefault();
- if(view==='day'){closeSidebar();openDayCatalog();return;}
+ if(view==='day'&&dayCatalogOpen){closeSidebar();openDayCatalog();return;}
  if(view==='stretch'){
   closeSidebar();
   revealStretchSection();
@@ -590,9 +623,17 @@ document.querySelectorAll('dialog').forEach(d=>{const h=d.querySelector('h2');if
 document.querySelectorAll('dialog:not(#access-dialog)').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busy)load(true);});
 document.addEventListener('juligym:unlocked',()=>load(true));
-document.addEventListener('juligym:locked',()=>{stopTimer();keepAwake(false);});
+document.addEventListener('juligym:locked',()=>{stretch.suspend();stopTimer();keepAwake(false);});
 addEventListener('online',()=>load(true));addEventListener('offline',()=>setConnection(false));
 setInterval(()=>{if(document.visibilityState==='visible'&&!busy&&!document.querySelector('dialog[open]'))load(true);},20000);
 $('#year').textContent=new Date().getFullYear();$('#sidebar-backdrop').innerHTML='';
 try{const cached=JSON.parse(localStorage.getItem('juligym2:shared-cache'));if(cached?.data?.plans)data=cached.data;}catch{}
 render();load();
+
+document.addEventListener('juligym:before-update',event=>{
+ event.detail.prepare=(async()=>{
+  await doseSaves.flush();
+  if(busy||doseSaves.unsaved){notify('Дождитесь сохранения изменений перед обновлением.',true);return false;}
+  stretch.suspend();stopTimer();keepAwake(false);return true;
+ })();
+});

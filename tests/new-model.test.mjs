@@ -11,11 +11,11 @@ test('progress counts known snapshot sets and ignores unrelated marks',()=>{cons
 test('guided resume uses snapshot order and the first missing or undone approach',()=>{
  const items=[{id:'legs01',sets:3},{id:'glutes01',sets:1}];
  const marks={'legs01:0':true,'legs01:1':false,'legs01:2':true,'glutes01:0':true,'extra:0':true};
- assert.deepEqual(firstPendingSet({items,marks}),{item:items[0],exerciseIndex:0,setIndex:1});
+ assert.deepEqual(firstPendingSet({items,marks}),{item:items[0],exerciseIndex:0,setIndex:1,side:0});
  marks['legs01:1']=true;
  assert.equal(firstPendingSet({items,marks}),null);
  delete marks['glutes01:0'];
- assert.deepEqual(firstPendingSet({items,marks}),{item:items[1],exerciseIndex:1,setIndex:0});
+ assert.deepEqual(firstPendingSet({items,marks}),{item:items[1],exerciseIndex:1,setIndex:0,side:0});
 });
 
 test('Today follows the local schedule and prioritizes an active session on the same date',()=>{

@@ -1,6 +1,15 @@
 import {icon} from './icons.js';
 const element=document.querySelector('#timer');let context,deadline=0,remaining=0,running=false,interval,voices=[],generation=0,sound=true,screen;
 let timerTitle, timerFinish, timerDuration;
+const observers=new Set();
+export function observeTimer(callback){observers.add(callback);return ()=>observers.delete(callback);}
+export function timerSnapshot(){return element.hidden?null:{remaining:running?Math.max(0,Math.ceil((deadline-Date.now())/1000)):remaining,title:timerTitle,finish:timerFinish,duration:timerDuration};}
+function changed(){for(const callback of observers)callback(timerSnapshot());}
+export function restoreTimer(snapshot){
+ if(!snapshot||!Number.isFinite(snapshot.remaining)||snapshot.remaining<0||snapshot.remaining>3600)return;
+ timerTitle=snapshot.title;timerFinish=snapshot.finish;timerDuration=snapshot.duration;
+ runTimer(snapshot.remaining,false);
+}
 try{sound=localStorage.getItem('juligym2:sound')!=='off';}catch{}
 function cancelAudio(){generation++;voices.forEach(o=>{try{o.stop();o.disconnect();}catch{}});voices=[];}
 function tone(t,f,d=.08){const o=context.createOscillator(),g=context.createGain();o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.07,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(context.destination);o.start(t);o.stop(t+d+.02);voices.push(o);o.onended=()=>{o.disconnect();g.disconnect();voices=voices.filter(n=>n!==o);};}
@@ -13,14 +22,16 @@ export function startTimer(seconds, title='Отдых между подхода�
  timerDuration=seconds;
  runTimer(seconds);
 }
-function runTimer(seconds) {
- clearInterval(interval);remaining=seconds;deadline=Date.now()+seconds*1000;running=true;element.hidden=false;
+function runTimer(seconds,autostart=true) {
+ clearInterval(interval);remaining=seconds;deadline=Date.now()+seconds*1000;running=autostart;element.hidden=false;
  element.setAttribute('aria-label',timerTitle);
  element.innerHTML=`<div class="timer-head">${icon('clock')}<span class="timer-description"></span><button data-timer-close aria-label="Закрыть таймер">${icon('close')}</button></div><div class="timer-body"><strong data-time></strong><button data-timer-toggle aria-label="Пауза или продолжение">Ⅱ</button><button data-timer-more>+15 с</button><button data-timer-close>Пропустить</button><button data-timer-sound aria-pressed="${sound}" aria-label="Звук таймера">${icon('sound')} ${sound?'Вкл':'Выкл'}</button></div>`;
  element.querySelector('.timer-description').textContent=timerTitle;
- audio(seconds);paint();interval=setInterval(paint,250);keepAwake(true);
+ if(autostart){audio(seconds);interval=setInterval(()=>{paint();changed();},250);keepAwake(true);}
+ else{cancelAudio();element.querySelector('[data-timer-toggle]').textContent=seconds?'▶':'↻';element.querySelector('.timer-description').textContent=seconds?'Таймер на паузе · продолжите, когда готовы':timerFinish;}
+ paint();changed();
 }
-export function stopTimer(){running=false;clearInterval(interval);cancelAudio();element.hidden=true;}
+export function stopTimer(){running=false;clearInterval(interval);cancelAudio();element.hidden=true;changed();}
 element.addEventListener('click',event=>{
  const button=event.target.closest('button');
  if(!button)return;
@@ -31,7 +42,7 @@ element.addEventListener('click',event=>{
   if(!running)return runTimer(remaining);
   paint();
   if(!running)return;
-  running=false;clearInterval(interval);cancelAudio();button.textContent='▶';
+  running=false;clearInterval(interval);cancelAudio();button.textContent='▶';changed();
  }
  if(button.hasAttribute('data-timer-sound')){
   sound=!sound;

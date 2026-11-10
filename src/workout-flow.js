@@ -1,3 +1,4 @@
+import {sessionResult,stretchProgress} from './session-progress.js';
 import {byId} from './catalog.js';
 import {anatomy, icon} from './icons.js';
 import {escape as esc, estimatedMinutes, firstPendingSet, formatDate, summary, todaySelection} from './state.js';
@@ -24,9 +25,9 @@ export function todayMarkup(data, date) {
   const pending = session && firstPendingSet(session);
   let main;
   if (items.length) {
-    const label = session?.finished_at ? 'Выполнено' : session ? 'В процессе' : 'По расписанию';
+    const label = session?.finished_at ? (session.result_status==='partial'?'Частично выполнено':'Выполнено') : session ? 'В процессе' : 'По расписанию';
     const estimate = session?.finished_at ? `${Math.max(1, Math.round(session.duration_seconds / 60))} мин` : `≈ ${estimatedMinutes({items})} мин`;
-    const next = pending ? `${byId[pending.item.id].title} · подход ${pending.setIndex + 1} из ${pending.item.sets}` : 'Все подходы отмечены';
+    const next = pending ? `${byId[pending.item.id].title} · подход ${pending.setIndex + 1} из ${pending.item.sets}${pending.side?' · '+(pending.side===1?'левая сторона':'правая сторона'):''}` : 'Все подходы отмечены';
     main = `<div class="today-card today-featured">
       ${anatomy(byId[items[0].id]?.group, 'today-anatomy')}
       <span class="eyebrow">${label}</span>
@@ -36,9 +37,9 @@ export function todayMarkup(data, date) {
       <div class="flow-actions">${todayAction(date, session?.plan_id || plan.id, session?.finished_at ? 'Посмотреть занятие' : session ? 'Продолжить' : 'Начать тренировку', !!session?.finished_at)}</div>
     </div>`;
   } else if(stretchIds.length){
-    main = `<div class="today-card today-featured"><span class="eyebrow">${session?.finished_at?'Выполнено':session?'В процессе':'По расписанию'}</span>
-      <h2>Растяжка · ${esc(title)}</h2><p>Движений в плане: ${stretchIds.length}</p>
-      <div class="flow-actions"><button class="button primary flow-primary" data-day-start ${session?.finished_at?'':'data-write'} data-workout-date="${date}" data-workout-plan="${esc(session?.plan_id||plan.id)}">${icon('play')} ${session?.finished_at?'Открыть растяжку':session?'Продолжить':'Начать растяжку'}</button></div></div>`;
+    main = `<div class="today-card today-featured"><span class="eyebrow">${session?.finished_at?(session.result_status==='partial'?'Частично выполнено':'Выполнено'):session?'В процессе':'По расписанию'}</span>
+      <h2>Растяжка · ${esc(title)}</h2><p>Движений в плане: ${stretchIds.length}${session&&(!session.finished_at||session.result_summary)?` · выполнено шагов: ${stretchProgress(session).done} из ${stretchProgress(session).total}`:''}</p>
+      <div class="flow-actions"><button class="button primary flow-primary" data-day-start ${session?.finished_at?'':'data-write'} data-workout-date="${date}" data-workout-plan="${esc(session?.plan_id||plan.id)}">${icon('play')} ${session?.finished_at?'Посмотреть результат':session?'Продолжить':'Начать растяжку'}</button></div></div>`;
   } else {
     main = `<div class="today-card">
       <h2>${data.plans.length ? 'День отдыха' : 'Расписание тренировок'}</h2>
@@ -58,30 +59,38 @@ export function todayMarkup(data, date) {
 
 export function guidedMarkup(session, renderExercise) {
   const progress = summary(session);
+  const result=sessionResult(session);
   const step = firstPendingSet(session);
   if (session.finished_at) {
     return `<div class="today-card flow-finished">${icon('check')}<h2 id="guided-step" tabindex="-1">Тренировка сохранена</h2>
-      <p>${savedApproaches(progress)} · ${formatDate(session.workout_date)}</p>
+      <p>${session.result_status==='partial'?'Частично выполнено · ':''}${savedApproaches(progress)} · ${formatDate(session.workout_date)}</p>
       <div class="flow-actions"><button class="button primary" data-workout-stretch>Растяжка после тренировки ${icon('arrow')}</button><button class="button quiet" data-view="today">На сегодня</button></div>
     </div>`;
   }
   if (!step) {
     return `<div class="today-card flow-finished">${icon('check')}<h2 id="guided-step" tabindex="-1">Все подходы выполнены</h2>
-      <p>Завершите тренировку, чтобы отметить день в календаре.</p>
-      <div class="flow-actions"><button class="button primary flow-primary" id="guided-finish" data-write>${icon('check')} Завершить тренировку</button></div>
+      <p>${result.stretch.total?'Силовая часть готова. Теперь можно перейти к растяжке.':'Сохраните занятие, чтобы отметить день в календаре.'}</p>
+      <div class="flow-actions">${result.stretch.total?`<button class="button primary" data-workout-stretch>К растяжке ${icon('arrow')}</button>`:`<button class="button primary flow-primary" id="guided-finish" data-write>${icon('check')} Сохранить занятие</button>`}</div>${result.stretch.total?finishChoice(session):''}
     </div>`;
   }
-  const {item, exerciseIndex, setIndex} = step;
+  const {item, exerciseIndex, setIndex, side} = step;
   const exercise = byId[item.id];
   const hold = exercise.unit === 'seconds' ? Number.parseInt(item.reps, 10) : 0;
   return `<div class="guided-position">
-    <h2 id="guided-step" tabindex="-1">Подход ${setIndex + 1} из ${item.sets}</h2>
+    <h2 id="guided-step" tabindex="-1">Подход ${setIndex + 1} из ${item.sets}${side?` · ${side===1?'левая':'правая'} сторона`:''}</h2>
     <span>Упражнение ${exerciseIndex + 1} из ${session.items.length}</span>
   </div>
   ${progressBar(progress)}<small class="guided-count">${savedApproaches(progress)}</small>
+  ${!result.worked?'<details class="flow-warmup"><summary>Сначала разминка · 5 мин</summary><p>2 минуты спокойного шага. Затем по минуте: движения плечами и локтями, неглубокие приседания с опорой, наклоны от таза и подъёмы на носки. Начните без гантелей.</p></details>':''}
   ${renderExercise(item, exerciseIndex, 'guided')}
   <div class="flow-actions guided-actions">
-    <button class="button primary flow-primary" id="guided-mark" data-guided-set="${item.id}:${setIndex}" data-write>${icon('check')} Подход готов</button>
+    <button class="button primary flow-primary" id="guided-mark" data-guided-set="${item.id}:${setIndex}${side?':'+side:''}" data-write>${icon('check')} ${side===1?'Левая готова → правая':side===2?'Правая готова · подход выполнен':'Подход готов'}</button>
     ${hold > 0 && hold <= 180 ? `<button class="button secondary" data-guided-hold="${hold}">${icon('clock')} Удержание ${hold} с</button>` : ''}
-  </div>`;
+  </div>${finishChoice(session)}`;
+}
+
+export function finishChoice(session){
+ const result=sessionResult(session);
+ if(session?.finished_at||!result.worked)return '';
+ return `<details class="finish-choice"><summary>На сегодня всё</summary><p>Сохранено действий: ${result.worked}. Выполнено подходов: ${result.strength.done} из ${result.strength.total}${result.stretch.total?' · шагов растяжки: '+result.stretch.done+' из '+result.stretch.total:''}. Сохраним только то, что получилось сделать. Занятие закроется.</p><button class="button secondary" data-finish-partial data-write>${result.status==='completed'?'Сохранить занятие':'Сохранить частичный результат'}</button><p>Для продолжения позже вернитесь на «Сегодня» без завершения — отмеченные шаги уже сохранены.</p></details>`;
 }
