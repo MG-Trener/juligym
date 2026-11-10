@@ -2,6 +2,7 @@ import {groups} from './catalog.js';
 import {icon, anatomy} from './icons.js';
 import {stretches, stretchById, stretchPresets, stretchCooldown} from './stretch-catalog.js';
 import {keepAwake, startTimer, stopTimer} from './timer.js';
+import {stretchExercise} from './day-settings.js';
 
 const selectionKey = 'juligym2:stretch-selection';
 const groupFilters = [{id: 'all', title: 'Все группы'}, ...groups];
@@ -110,7 +111,7 @@ export function initStretch(root, getOpenTechnique) {
     if (!step) {
       guided.innerHTML = `<div class="stretch-complete">${icon('check')}<h2 tabindex="-1">Комплекс завершён</h2><p>${title}</p>${day ? `<button class="button primary" data-day-stretch-finish data-write data-workout-date="${day.workout_date}" data-workout-plan="${day.plan_id}">Сохранить в дневник</button>` : '<button class="button primary" data-stretch-home>К комплексам</button>'}</div>`;
     } else {
-      const exercise = stretchById[step.id];
+      const exercise = stretchExercise(step.id,session.settings);
       const side = exercise.unilateral ? ` · сторона ${step.side} из 2` : '';
       const label = step.side === 1 && exercise.unilateral ? 'Сменить сторону' : position === steps.length - 1 ? 'Завершить' : 'Следующее упражнение';
       guided.innerHTML = `<div class="stretch-step-heading">
@@ -139,14 +140,14 @@ export function initStretch(root, getOpenTechnique) {
     showStep();
   }
 
-  function start(title, ids, day) {
+  function start(title, ids, day, settings=day?.stretch_settings||{}) {
     if (!ids.length) return;
     if(day && session?.day?.id===day.id){showStep();return;}
     const steps = ids.flatMap((id, exerciseIndex) => {
       const first = {id, exerciseIndex, side: 1};
       return stretchById[id].unilateral ? [first, {...first, side: 2}] : [first];
     });
-    session = {title, steps, exerciseCount: ids.length, position: 0, day};
+    session = {title, steps, exerciseCount: ids.length, position: 0, day, settings};
     goToStep(0);
   }
 
@@ -195,7 +196,7 @@ export function initStretch(root, getOpenTechnique) {
     if (!session || guided.hidden) return;
     const step = session.steps[session.position];
     if (!step) return;
-    if (button.hasAttribute('data-stretch-hold')) startTimer(stretchById[step.id].seconds, 'Удержание растяжки', holdMessage);
+    if (button.hasAttribute('data-stretch-hold')) startTimer(stretchExercise(step.id,session.settings).seconds, 'Удержание растяжки', holdMessage);
     if (button.hasAttribute('data-stretch-next')) goToStep(session.position + 1);
     if (button.hasAttribute('data-stretch-previous')) goToStep(session.position - 1);
     if (button.hasAttribute('data-stretch-skip')) {

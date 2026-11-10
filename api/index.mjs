@@ -1,7 +1,7 @@
 import pg from 'pg';
 import {attachDatabasePool} from '@neon/functions';
 import {randomUUID} from 'node:crypto';
-import {InputError,dateValue,planValue,scheduleValue,dayEdit,editDayItems,progress} from './model.mjs';
+import {InputError,dateValue,planValue,scheduleValue,dayEdit,editDayItems,daySettings,editDaySettings,progress} from './model.mjs';
 import {passwordMatches,issueAccess,validAccess} from './access.mjs';
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:10000,idleTimeoutMillis:20000});
 attachDatabasePool(pool);pool.on('error',()=>console.error('Database pool error'));
@@ -21,18 +21,18 @@ async function ensureSession(c,date,planId){
  if(existing)return existing;
  const plan=(await c.query('SELECT * FROM juli_plans WHERE id=$1',[planId])).rows[0];if(!plan)throw new InputError('Комплекс не найден.',404);
  if(!plan.items.length&&!plan.stretch_ids.length)throw new InputError('Сначала добавьте упражнения.');
- await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items,stretch_ids) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(workout_date,plan_id) DO NOTHING',[randomUUID(),date,planId,plan.title,JSON.stringify(plan.items),JSON.stringify(plan.stretch_ids)]);
+ await c.query('INSERT INTO juli_sessions(id,workout_date,plan_id,title,items,stretch_ids,stretch_settings) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workout_date,plan_id) DO NOTHING',[randomUUID(),date,planId,plan.title,JSON.stringify(plan.items),JSON.stringify(plan.stretch_ids),JSON.stringify(plan.stretch_settings)]);
  return (await c.query('SELECT * FROM juli_sessions WHERE workout_date=$1 AND plan_id=$2 FOR UPDATE',[date,planId])).rows[0];
 }
 async function changeDay(c,edit){
  const schedule=(await c.query('SELECT * FROM juli_schedule WHERE id=1 FOR UPDATE')).rows[0];
  const assigned=schedule.weekdays[edit.weekday];
  const base=assigned?(await c.query('SELECT * FROM juli_plans WHERE id=$1 FOR UPDATE',[assigned])).rows[0]:null;
- const next=editDayItems(base,edit);
+ const next=edit.field?editDaySettings(base,edit):editDayItems(base,edit);
  if(!next)return {plan:base,schedule};
- const plan=(await c.query(`INSERT INTO juli_plans(id,title,subtitle,items,stretch_ids) VALUES($1,$2,'Мой план недели',$3,$4)
-  ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title,items=EXCLUDED.items,stretch_ids=EXCLUDED.stretch_ids,revision=juli_plans.revision+1,updated_at=now() RETURNING *`,
- [edit.id,base?.title||edit.title,JSON.stringify(next.items),JSON.stringify(next.stretchIds)])).rows[0];
+ const plan=(await c.query(`INSERT INTO juli_plans(id,title,subtitle,items,stretch_ids,stretch_settings) VALUES($1,$2,'Мой план недели',$3,$4,$5)
+  ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title,items=EXCLUDED.items,stretch_ids=EXCLUDED.stretch_ids,stretch_settings=EXCLUDED.stretch_settings,revision=juli_plans.revision+1,updated_at=now() RETURNING *`,
+ [edit.id,base?.title||edit.title,JSON.stringify(next.items),JSON.stringify(next.stretchIds),JSON.stringify(next.stretchSettings)])).rows[0];
  const weekdays={...schedule.weekdays};
  if(next.items.length||next.stretchIds.length)weekdays[edit.weekday]=edit.id;
  else delete weekdays[edit.weekday];
@@ -77,8 +77,8 @@ export default {async fetch(request){
   if(route==='/schedule'){
    const plans=(await pool.query('SELECT id FROM juli_plans')).rows.map(r=>r.id),weekdays=scheduleValue(body.weekdays,plans);const r=await pool.query('UPDATE juli_schedule SET weekdays=$1,revision=revision+1 WHERE id=1 AND revision=$2 RETURNING *',[JSON.stringify(weekdays),body.revision]);if(!r.rowCount)throw new InputError('Расписание изменено в другом окне. Обновите данные.',409);return reply({schedule:r.rows[0]});
   }
-  if(route==='/day-exercise'){
-   const edit=dayEdit(body);
+  if(route==='/day-exercise'||route==='/day-settings'){
+   const edit=route==='/day-settings'?daySettings(body):dayEdit(body);
    return reply(await transaction(c=>changeDay(c,edit)));
   }
   const date=dateValue(body.date);const currentDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Qyzylorda'});if(date>currentDate)throw new InputError('Будущие дни доступны только для планирования.');if(!/^[a-zA-Z0-9-]{1,50}$/.test(body.planId||''))throw new InputError('Выберите комплекс.');

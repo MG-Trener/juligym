@@ -2,6 +2,7 @@ import {exercises,groups,byId} from './catalog.js';
 import {stretches,stretchById} from './stretch-catalog.js';
 import {icon} from './icons.js';
 import {escape as esc,formatDate,today,plannedWorkout,sessionForDate} from './state.js';
+import {stretchExercise} from './day-settings.js';
 
 const shortDate={weekday:'long',day:'numeric',month:'long'};
 const matchText=value=>value.toLocaleLowerCase('ru').replaceAll('ё','е');
@@ -11,23 +12,34 @@ export function dayEditButton(id, included, compact=false) {
  return `<button type="button" class="button secondary day-edit${compact?' day-edit-compact':''}" data-day-edit="${id}" data-day-added="${!included}" data-write aria-label="${included?'Убрать':'Добавить'}: ${esc(title)}">${included?'−':'+'}${compact?'':included?' Убрать из дня':' Добавить в день'}</button>`;
 }
 
-function illustratedTile(exercise,included,dose=''){
- return `<article class="day-library-card">
+function illustratedTile(exercise,included,dose='',editor=''){
+ return `<article class="day-library-card" data-day-card="${exercise.id}">
   <button class="exercise-art" data-image="${exercise.id}" aria-label="Увеличить: ${esc(exercise.title)}"><img src="./media/${exercise.id}.webp" alt="${esc(exercise.title)}, три фазы" width="1536" height="1024" loading="lazy"></button>
   <div><div><h3>${esc(exercise.title)}</h3>${dose?`<p>${esc(dose)}</p>`:''}</div>${dayEditButton(exercise.id,included,true)}</div>
+  ${editor}
  </article>`;
+}
+
+function doseEditor(exercise,fields){
+ return `<div class="day-dose"><div class="day-dose-fields">${fields.map(({field,label,value,min,max})=>`<label>${label}${field==='sets'?`<select data-dose="sets" data-exercise="${exercise.id}" aria-label="Подходы: ${esc(exercise.title)}">${[1,2,3,4,5].map(n=>`<option value="${n}" ${value===n?'selected':''}>${n}</option>`).join('')}</select>`:`<input data-dose="${field}" data-exercise="${exercise.id}" type="${field==='reps'?'text':'number'}" ${field==='reps'?'maxlength="10"':`inputmode="numeric" min="${min}" max="${max}" step="1"`} value="${esc(value)}" aria-label="${label}: ${esc(exercise.title)}" aria-describedby="dose-status-${exercise.id}" autocomplete="off">`}</label>`).join('')}</div>
+ <small class="day-dose-status" id="dose-status-${exercise.id}" role="status">Сохраняется автоматически</small>
+ <div class="day-dose-recovery" hidden><button type="button" class="text-button" data-dose-retry="${exercise.id}">Повторить</button><button type="button" class="text-button" data-dose-reset="${exercise.id}">Отменить изменение</button></div></div>`;
 }
 
 function strengthTile(item){
  const exercise=byId[item.id];
- const unit=exercise.unit==='seconds'?(item.reps.endsWith('с')?'':' с'):' повт.';
- return illustratedTile(exercise,true,`${item.sets} × ${item.reps}${unit}${exercise.unilateral?' на сторону':''}`);
+ return illustratedTile(exercise,true,exercise.unilateral?'На каждую сторону':'',doseEditor(exercise,[
+  {field:'sets',label:'Подходы',value:item.sets},
+  {field:'reps',label:exercise.unit==='seconds'?'Удержание, с':'Повторы',value:item.reps.replace(/ с$/,'')}
+ ]));
 }
 
-function stretchTile(id){
- const exercise=stretchById[id];
- const dose=exercise.seconds?`${exercise.seconds} с`:`${exercise.repetitions} повт.`;
- return illustratedTile(exercise,true,dose+(exercise.unilateral?' на сторону':''));
+function stretchTile(id,settings){
+ const exercise=stretchExercise(id,settings);
+ return illustratedTile(exercise,true,exercise.unilateral?'На каждую сторону':'',doseEditor(exercise,[
+  exercise.seconds?{field:'seconds',label:'Удержание, с',value:exercise.seconds,min:5,max:300}:
+   {field:'repetitions',label:'Плавные повторы',value:exercise.repetitions,min:1,max:99}
+ ]));
 }
 
 export function dayMarkup(data,date) {
@@ -45,13 +57,13 @@ export function dayMarkup(data,date) {
   <p>${items.length||stretchIds.length?`${items.length} силовых · ${stretchIds.length} на растяжку`:'День свободен. Добавьте упражнения из библиотеки.'}${session?.finished_at?' · Выполнено':''}</p></div>
   ${start?`<button class="button primary flow-primary" data-day-start data-workout-plan="${esc(sessionPlan.plan_id||sessionPlan.id)}" data-workout-date="${date}" ${session?.finished_at?'':'data-write'}>${icon('play')} ${actionLabel}</button>`:''}
  </div>
- <p class="day-note">${session&&!session.finished_at?'Начатое занятие продолжится по сохранённому составу. Изменения плана применятся к следующим занятиям.':'Состав дня повторяется каждую неделю.'}</p>
+ <p class="day-note">${session&&!session.finished_at?'Начатое занятие продолжится с прежними упражнениями и нагрузкой. Изменения плана применятся к следующим занятиям.':'Состав и нагрузка этого дня повторяются каждую неделю.'}</p>
  <div class="day-tools" role="group" aria-label="Добавить упражнения">
   <button class="button secondary" data-day-catalog="strength">+ Силовое упражнение</button>
   <button class="button secondary" data-day-catalog="stretch">+ Растяжка</button>
  </div>`;
  const lists=`${items.length?`<section class="day-list"><h3>Силовые упражнения</h3><div class="day-library">${items.map(strengthTile).join('')}</div></section>`:''}
- ${stretchIds.length?`<section class="day-list"><div class="section-heading"><h3>Растяжка</h3>${items.length?`<button class="button quiet" data-day-stretch-preview>Открыть растяжку →</button>`:''}</div><div class="day-library">${stretchIds.map(stretchTile).join('')}</div></section>`:''}`;
+ ${stretchIds.length?`<section class="day-list"><div class="section-heading"><h3>Растяжка</h3>${items.length?`<button class="button quiet" data-day-stretch-preview>Открыть растяжку →</button>`:''}</div><div class="day-library">${stretchIds.map(id=>stretchTile(id,plan.stretch_settings)).join('')}</div></section>`:''}`;
  return {intro,lists};
 }
 

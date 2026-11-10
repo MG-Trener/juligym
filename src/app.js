@@ -8,6 +8,7 @@ import {initStretch} from './stretch.js';
 import {stretches,stretchById} from './stretch-catalog.js';
 import {todayMarkup,guidedMarkup} from './workout-flow.js';
 import {dayMarkup,dayEditButton,catalogMarkup,catalogGroupOptions} from './week-plan.js';
+import {createDayAutosave} from './day-autosave.js';
 const $=s=>document.querySelector(s),days=['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
 let openTechnique=null;
 const stretch=initStretch($('#stretch-view'),()=>openTechnique);
@@ -19,6 +20,17 @@ const exerciseWord=n=>plural(n,'упражнение','упражнения','у
 const strengthGroups=[{id:'all',title:'Все группы мышц',count:exercises.length},...groups];
 const stretchGroups=strengthGroups.map(g=>({...g,count:g.id==='all'?stretches.length:stretches.filter(e=>e.group===g.id).length}));
 const ui={};
+let savingDose=false;
+const doseSaves=createDayAutosave(async body=>{
+ savingDose=true;
+ try{
+  const result=await mutate('day-settings',body);
+  if(!result)throw new Error('Не сохранено. Проверьте связь и повторите.');
+ }finally{savingDose=false;}
+},()=>{
+ renderBusy();renderDoseState();
+ if(!doseSaves.pending){render();if(loadedWeek!==week)void load(true);}
+});
 const activeMode=()=>view==='day'?dayMode:view==='stretch'?'stretch':'strength';
 const catalogFilters=()=>activeMode()==='stretch'?stretch.filters:{group,query};
 try{selectedPlan=localStorage.getItem('juligym2:selected-plan')||selectedPlan;}catch{}
@@ -36,7 +48,7 @@ function cacheDiary(){
  try{localStorage.setItem('juligym2:shared-cache',JSON.stringify({data,week:loadedWeek}));}catch{}
 }
 async function load(silent=false){
- if(!isUnlocked()||busy)return;
+ if(!isUnlocked()||busy||doseSaves.pending)return;
  if(view==='today')week=weekStart(today());
  const requestedWeek=week;
  const token=++loadNumber;
@@ -44,6 +56,7 @@ async function load(silent=false){
   const next=await request(`state?from=${addDays(requestedWeek,-7)}&to=${addDays(requestedWeek,6)}`);
   if(token!==loadNumber)return;
   data=next;
+  doseSaves.clearSaved();
   loadedWeek=requestedWeek;
   cacheDiary();
   setConnection(true);
@@ -61,7 +74,7 @@ async function mutate(path,body){
  loadNumber++;busy=true;renderBusy();
  try{
   const result=await request(path,body);
-  if(path==='day-exercise'){
+  if(path==='day-exercise'||path==='day-settings'){
    const {plan,schedule}=result;
    if(plan)data.plans=[...data.plans.filter(saved=>saved.id!==plan.id),plan];
    data.schedule=schedule;
@@ -93,15 +106,17 @@ function renderBusy(){
  const session=currentSession();
  const progress=summary(session||{items:currentItems(),marks:{}});
  const future=selectedDate>today();
- const readOnly=busy||!online;
+ const readOnly=busy||!online||doseSaves.pending;
  document.querySelectorAll('[data-write]').forEach(button=>{
   let disabled=readOnly;
   if(button.hasAttribute('data-today-start'))disabled ||= loadedWeek!==weekStart(today());
   if(button.hasAttribute('data-day-start'))disabled ||= loadedWeek!==weekStart(view==='today'?today():button.dataset.workoutDate);
+  if(button.hasAttribute('data-day-start'))disabled ||= [...doseSaves.entries.values()].some(entry=>entry.body.weekday===dayIndex(button.dataset.workoutDate)&&entry.state!=='saved');
   if(button.hasAttribute('data-set')||button.hasAttribute('data-guided-set'))disabled ||= future||!!session?.finished_at;
   if(button.id==='finish-workout'||button.id==='guided-finish')disabled ||= future||!session||!!session.finished_at||!progress.total||progress.done!==progress.total;
   button.disabled=disabled;
  });
+ document.querySelectorAll('[data-dose]').forEach(field=>field.disabled=!online||(busy&&!savingDose));
  $('#training-start').disabled=readOnly||!selected()||future;
  $('#day-offline').hidden=online||!data.plans.length;
  $('#today-offline').hidden=online||!data.plans.length;
@@ -224,8 +239,34 @@ function renderDayCatalog(){
 function renderDay(){
  const {intro,lists}=dayMarkup(data,selectedDate);
  if(intro!==ui.dayIntro){$('#day-intro').innerHTML=intro;ui.dayIntro=intro;}
- if(lists!==ui.dayLists){$('#day-lists').innerHTML=lists;ui.dayLists=lists;}
+ // A background refresh must not replace the input under the user's fingers.
+ if((lists!==ui.dayLists||ui.dayDate!==selectedDate)&&
+    (ui.dayDate!==selectedDate||!document.activeElement?.matches('[data-dose]'))){
+  $('#day-lists').innerHTML=lists;ui.dayLists=lists;ui.dayDate=selectedDate;
+ }
+ renderDoseState();
  renderDayCatalog();
+}
+
+function renderDoseState(){
+ const weekday=dayIndex(selectedDate);
+ for(const card of document.querySelectorAll('#day-lists [data-day-card]')){
+  const id=card.dataset.dayCard;
+  const entries=[...doseSaves.entries.values()].filter(entry=>entry.body.weekday===weekday&&entry.body.exerciseId===id);
+  for(const input of card.querySelectorAll('[data-dose]')){
+   const entry=entries.find(entry=>entry.body.field===input.dataset.dose);
+   if(entry&&entry.state!=='saved'&&document.activeElement!==input)input.value=entry.raw;
+   input.setAttribute('aria-invalid',String(entry?.state==='invalid'));
+  }
+  const error=entries.find(entry=>['invalid','error'].includes(entry.state));
+  const saving=entries.some(entry=>['pending','saving'].includes(entry.state));
+  const status=card.querySelector('.day-dose-status');
+  status.textContent=error?error.message:saving?'Сохранение…':entries.length?'Сохранено':'Сохраняется автоматически';
+  status.classList.toggle('error',!!error);
+  status.classList.toggle('saved',!error&&!saving&&!!entries.length);
+  card.querySelector('.day-dose-recovery').hidden=!error;
+  card.querySelector('[data-dose-retry]').hidden=error?.state!=='error';
+ }
 }
 function render(){
  try{localStorage.setItem('juligym2:selected-plan',selectedPlan);}catch{}
@@ -293,6 +334,7 @@ async function editDay(id,added){
  const date=selectedDate;
  const result=await mutate('day-exercise',{weekday:dayIndex(date),exerciseId:id,added});
  if(!result){await load(true);return;}
+ if(!added)doseSaves.discard(dayIndex(date),id);
  render();
  notify(added?`Добавлено на ${formatDate(date)}.`:`Убрано из плана на ${formatDate(date)}.`);
 }
@@ -306,7 +348,7 @@ async function beginDay(date,planId){
  selectedDate=date;
  selectedPlan=planId;
  setView('stretch');
- stretch.start(plan.title,plan.stretch_ids);
+ stretch.start(plan.title,plan.stretch_ids,undefined,plan.stretch_settings);
  renderBusy();
 }
 
@@ -347,7 +389,7 @@ async function beginGuided(date,planId){
  week=weekStart(date);
  if(!result.session.items.length&&result.session.stretch_ids?.length){
   setView('stretch');
-  stretch.start(result.session.title,result.session.stretch_ids,result.session.finished_at?undefined:result.session);
+  stretch.start(result.session.title,result.session.stretch_ids,result.session.finished_at?undefined:result.session,result.session.stretch_settings);
   renderBusy();
   return;
  }
@@ -400,13 +442,15 @@ document.addEventListener('click',async event=>{
  const hint=event.target.closest('.technique>summary');if(hint){event.preventDefault();const panel=hint.parentElement;openTechnique=panel.open?null:panel.dataset.technique;document.querySelectorAll('.technique').forEach(d=>d.open=d.dataset.technique===openTechnique);return;}
  if(event.target.closest('#lock-access')){stopTimer();keepAwake(false);lockAccess();return;}
  const b=event.target.closest('button');if(!b)return;
+ if(b.dataset.doseRetry){doseSaves.retry(dayIndex(selectedDate),b.dataset.doseRetry);return;}
+ if(b.dataset.doseReset){doseSaves.discard(dayIndex(selectedDate),b.dataset.doseReset);ui.dayLists=null;render();return;}
  if(b.id==='day-stretch-routines'){stretch.openCatalog();setView('stretch');return;}
  if(b.dataset.dayEdit){await editDay(b.dataset.dayEdit,b.dataset.dayAdded==='true');return;}
  if(b.hasAttribute('data-day-start')){await beginDay(b.dataset.workoutDate,b.dataset.workoutPlan);return;}
  if(b.hasAttribute('data-day-stretch-finish')){await finishDayStretch(b.dataset.workoutDate,b.dataset.workoutPlan);return;}
  if(b.hasAttribute('data-day-stretch-preview')){
   const plan=plannedWorkout(data,selectedDate);
-  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids);}
+  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids,undefined,plan.stretch_settings);}
   return;
  }
  if(view==='day'){
@@ -459,7 +503,7 @@ document.addEventListener('click',async event=>{
  if(b.dataset.view)setView(b.dataset.view);
  if(b.id==='stretch-after'||b.hasAttribute('data-workout-stretch')){
   const plan=currentSession()||selected();
-  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids);return;}
+  if(plan?.stretch_ids?.length){setView('stretch');stretch.start(plan.title,plan.stretch_ids,undefined,plan.stretch_settings);return;}
   stretch.recommend(currentItems().map(item=>byId[item.id]?.group));
   setView('stretch');
   $('#stretch-cooldown button').focus({preventScroll:true});
@@ -505,6 +549,16 @@ document.addEventListener('click',async event=>{
  if(b.id==='show-all-plans'){$('#plans').classList.toggle('all-plans');b.setAttribute('aria-expanded',String($('#plans').classList.contains('all-plans')));}
  if(b.dataset.historyDate){selectedDate=b.dataset.historyDate;week=weekStart(selectedDate);selectedPlan=b.dataset.historyPlan;await load();setView('workout');}
 });
+function editDose(event){
+ const input=event.target;
+ if(!input.matches('[data-dose]')||!isUnlocked()||!online)return;
+ doseSaves.edit({weekday:dayIndex(selectedDate),exerciseId:input.dataset.exercise,field:input.dataset.dose},input.value);
+ if(event.type==='change')void doseSaves.flush();
+}
+document.addEventListener('input',editDose);
+document.addEventListener('change',editDose);
+document.addEventListener('focusout',event=>{if(event.target.matches('[data-dose]')){void doseSaves.flush();setTimeout(()=>{if(view==='day')renderDay();renderBusy();},0);}});
+window.addEventListener('beforeunload',event=>{if(doseSaves.unsaved){event.preventDefault();event.returnValue='';}});
 document.addEventListener('change',event=>{const e=event.target;if(e.dataset.editorSets)editorItems.find(i=>i.id===e.dataset.editorSets).sets=Number(e.value);if(e.dataset.editorReps)editorItems.find(i=>i.id===e.dataset.editorReps).reps=e.value;if(e.dataset.editorRest)editorItems.find(i=>i.id===e.dataset.editorRest).rest=Number(e.value);});
 $('#search').addEventListener('input',event=>{
  const value=event.target.value;

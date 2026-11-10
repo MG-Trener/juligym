@@ -1,5 +1,6 @@
 import {byId} from '../src/catalog.js';
 import {stretchById} from '../src/stretch-catalog.js';
+import {doseValue} from '../src/day-settings.js';
 export class InputError extends Error{constructor(message,status=400){super(message);this.status=status;}}
 export function dateValue(value){if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value+'T12:00:00Z'))||new Date(value+'T12:00:00Z').toISOString().slice(0,10)!==value)throw new InputError('Некорректная дата.');return value;}
 export function planValue(input){
@@ -25,6 +26,7 @@ export function dayEdit(input) {
 
 export function editDayItems(base, {exerciseId, added, strength}) {
  const items=base?.items||[], stretchIds=base?.stretch_ids||[];
+ const stretchSettings={...base?.stretch_settings};
  const list=strength?items:stretchIds;
  const includes=list.some(item=>(strength?item.id:item)===exerciseId);
  if(includes===added)return null;
@@ -32,9 +34,26 @@ export function editDayItems(base, {exerciseId, added, strength}) {
  if(strength){
   const exercise=byId[exerciseId];
   const next=added?[...items,{id:exerciseId,sets:2,reps:exercise.reps,rest:exercise.rest}]:items.filter(item=>item.id!==exerciseId);
-  return {items:next, stretchIds};
+  return {items:next, stretchIds, stretchSettings};
  }
- return {items, stretchIds:added?[...stretchIds,exerciseId]:stretchIds.filter(id=>id!==exerciseId)};
+ if(!added)delete stretchSettings[exerciseId];
+ return {items, stretchIds:added?[...stretchIds,exerciseId]:stretchIds.filter(id=>id!==exerciseId), stretchSettings};
+}
+
+export function daySettings(input) {
+ const edit=dayEdit({...input,added:true});
+ try{return {...edit,field:input.field,value:doseValue(edit.exerciseId,input.field,input.value)};}
+ catch(error){throw new InputError(error.message);}
+}
+
+export function editDaySettings(base,{exerciseId,strength,field,value}) {
+ const items=base?.items||[],stretchIds=base?.stretch_ids||[];
+ if(!(strength?items.some(item=>item.id===exerciseId):stretchIds.includes(exerciseId)))
+  throw new InputError('Упражнение уже убрано из дня. Обновите план.',409);
+ const stretchSettings={...base?.stretch_settings};
+ if(strength)return {items:items.map(item=>item.id===exerciseId?{...item,[field]:value}:item),stretchIds,stretchSettings};
+ stretchSettings[exerciseId]={[field]:value};
+ return {items,stretchIds,stretchSettings};
 }
 export const defaultPlans=[
  {id:'legs',title:'Ноги и ягодицы',subtitle:'Сила и опора · нижняя часть тела',ids:['legs01','glutes01','legs11','glutes06','legs09','core06']},

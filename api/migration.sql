@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS juli_operations (
 );
 ALTER TABLE juli_plans ADD COLUMN IF NOT EXISTS stretch_ids jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS stretch_ids jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE juli_plans ADD COLUMN IF NOT EXISTS stretch_settings jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE juli_sessions ADD COLUMN IF NOT EXISTS stretch_settings jsonb NOT NULL DEFAULT '{}';
