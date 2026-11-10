@@ -1,7 +1,7 @@
 import {exercises,groups,byId} from './catalog.js';
 import {stretches,stretchById} from './stretch-catalog.js';
 import {icon} from './icons.js';
-import {escape as esc,formatDate,today,dayIndex,plannedWorkout,sessionForDate} from './state.js';
+import {escape as esc,formatDate,today,dayIndex,plannedWorkout,sessionForDate,estimateLabel,estimateHint} from './state.js';
 import {stretchExercise} from './day-settings.js';
 
 const shortDate={weekday:'long',day:'numeric',month:'long'};
@@ -64,7 +64,7 @@ export function dayMarkup(data,date) {
  const actionLabel=session?.finished_at?'Посмотреть результат':session?'Продолжить':sessionPlan?.items.length?'Начать тренировку':'Начать растяжку';
  const intro=`<div class="day-summary">
   <div><span class="eyebrow">${session?.finished_at?'ЗАНЯТИЕ СОХРАНЕНО':session?'ЗАНЯТИЕ В ПРОЦЕССЕ':date===today()?'СЕГОДНЯ':'ЗАНЯТИЕ ПО РАСПИСАНИЮ'}</span><h2 id="day-title" tabindex="-1">${label}</h2>
-  <p>${sessionItems.length||sessionStretches.length?`${sessionItems.length} силовых · ${sessionStretches.length} на растяжку`:'День свободен. Добавьте упражнения в план ниже.'}${session?.finished_at?(session.result_status==='partial'?' · Частично выполнено':' · Выполнено'):''}</p></div>
+  <p>${sessionItems.length||sessionStretches.length?`${sessionItems.length} силовых · ${sessionStretches.length} на растяжку`:'День свободен. Добавьте упражнения в план ниже.'}${session?.finished_at?(session.result_status==='partial'?' · Частично выполнено':' · Выполнено'):''}</p>${sessionPlan?`<small class="time-note" title="${estimateHint(sessionPlan)}">По плану ${estimateLabel(sessionPlan)}</small>`:''}</div>
   ${start?`<button class="button primary flow-primary" data-day-start data-workout-plan="${esc(sessionPlan.plan_id||sessionPlan.id)}" data-workout-date="${date}" ${session?.finished_at?'':'data-write'}>${icon('play')} ${actionLabel}</button>`:''}
  </div>
  <div class="day-template-heading"><h3 id="day-template-title">${weeklyLabel(dayIndex(date))}</h3><p class="day-note">Состав, нагрузка и порядок повторяются каждую неделю.${session?` Занятие ${formatDate(date)} ${session.finished_at?'уже сохранено':'уже начато'} — оно останется прежним.`:''}</p></div>

@@ -1,7 +1,7 @@
 import {separateSides,setDone,sideDone,sessionResult,stretchProgress,advanceStretch,stretchSteps} from './session-progress.js';
 import {exercises,groups,byId} from './catalog.js';
 import {icon,anatomy} from './icons.js';
-import {today,addDays,weekStart,dayIndex,summary,estimatedMinutes,formatDate,firstPendingSet,plannedWorkout,sessionForDate,escape as esc} from './state.js';
+import {today,addDays,weekStart,dayIndex,summary,estimateLabel,formatDate,firstPendingSet,plannedWorkout,sessionForDate,escape as esc} from './state.js';
 import {request} from './api.js';
 import {isUnlocked,lockAccess} from './access.js';
 import {startTimer,stopTimer,keepAwake} from './timer.js';
@@ -183,7 +183,7 @@ function renderWeek(){
 }
 function renderPlans(){
  const plans=data.plans.filter(plan=>!plan.id.startsWith('weekday-')||plan.id===selectedPlan);
- $('#plans').innerHTML=plans.map(plan=>{const sess=data.sessions.find(s=>s.plan_id===plan.id&&s.workout_date===selectedDate),p=summary(sess||{items:plan.items,marks:{}}),g=byId[plan.items[0]?.id]?.group||'all';return `<button data-plan="${plan.id}" class="plan-card ${plan.id===selectedPlan?'active':''}" aria-pressed="${plan.id===selectedPlan}"><span class="plan-badge">${sess?.finished_at?(sess.result_status==='partial'?'ЧАСТИЧНО':'ВЫПОЛНЕНО'):plan.id===selectedPlan?'АКТИВНАЯ':'ПОДБОРКА'}</span><h3>${esc(plan.title)}</h3><p>${plan.items.length} ${exerciseWord(plan.items.length)} · ≈ ${estimatedMinutes(plan)} мин</p><div class="progress-line"><span style="width:${p.percent}%"></span></div><div class="plan-percent"><span>${sess?.finished_at?'Сохранено в дневнике':p.done?`${p.done} из ${p.total} подходов`:'Запланировано'}</span><strong>${p.percent}%</strong></div>${anatomy(g,'plan-anatomy')}<span class="plan-action">${plan.id===selectedPlan?'К упражнениям':'Открыть'} ${icon('arrow')}</span></button>`;}).join('');
+ $('#plans').innerHTML=plans.map(plan=>{const sess=data.sessions.find(s=>s.plan_id===plan.id&&s.workout_date===selectedDate),p=summary(sess||{items:plan.items,marks:{}}),g=byId[plan.items[0]?.id]?.group||'all';return `<button data-plan="${plan.id}" class="plan-card ${plan.id===selectedPlan?'active':''}" aria-pressed="${plan.id===selectedPlan}"><span class="plan-badge">${sess?.finished_at?(sess.result_status==='partial'?'ЧАСТИЧНО':'ВЫПОЛНЕНО'):plan.id===selectedPlan?'АКТИВНАЯ':'ПОДБОРКА'}</span><h3>${esc(plan.title)}</h3><p>${plan.items.length} ${exerciseWord(plan.items.length)} · по плану ${estimateLabel(sess||plan)}</p><div class="progress-line"><span style="width:${p.percent}%"></span></div><div class="plan-percent"><span>${sess?.finished_at?'Сохранено в дневнике':p.done?`${p.done} из ${p.total} подходов`:'Запланировано'}</span><strong>${p.percent}%</strong></div>${anatomy(g,'plan-anatomy')}<span class="plan-action">${plan.id===selectedPlan?'К упражнениям':'Открыть'} ${icon('arrow')}</span></button>`;}).join('');
 }
 function exerciseCard(item,index,kind='exercise'){
  const e=byId[item.id];
@@ -215,7 +215,7 @@ function exerciseCard(item,index,kind='exercise'){
   <button class="exercise-art" data-image="${e.id}" aria-label="Увеличить: ${e.title}, три фазы"><img src="./media/${e.id}.webp" alt="Юля: ${e.title}. Коралловым выделены ${e.muscles.toLowerCase()}." width="1536" height="1024" loading="${guided||index<2?'eager':'lazy'}"><span class="art-zoom">↗</span></button>
   <div class="phase-labels">${e.phases.map((phase,i)=>`<div><b>${i+1}</b><span>${phase}</span></div>`).join('')}</div>
   ${meta}
-  <details class="technique" data-technique="${cardId}" ${openTechnique===cardId?'open':''}><summary>${icon('info')} Техника и подсказка</summary><ol>${e.steps.map(step=>`<li>${step}</li>`).join('')}</ol><p>${e.cue}</p><p><b>Легче:</b> ${e.easier}</p></details>
+  <details class="technique" data-technique="${cardId}" ${openTechnique===cardId?'open':''}><summary>${icon('info')} Техника · как сделать легче</summary><ol>${e.steps.map(step=>`<li>${step}</li>`).join('')}</ol><p>${e.cue}</p><p class="easier-tip"><b>Как сделать легче</b>${e.easier}</p></details>
   ${actions}
  </article>`;
 }
@@ -626,7 +626,7 @@ document.addEventListener('click',async event=>{
  if(b.dataset.guidedHold)startTimer(Number(b.dataset.guidedHold),'Удержание','Удержание завершено. Можно отметить подход.');
  if(b.id==='finish-workout'||b.id==='guided-finish'||b.hasAttribute('data-finish-partial'))await finishTraining();
  if(b.dataset.rest)startTimer(Number(b.dataset.rest));
- if(b.dataset.image){const e=byId[b.dataset.image]||stretchById[b.dataset.image];imageExercise=e.id;$('#image-title').textContent=e.title;$('#image-large').src=`./media/${e.id}.webp`;$('#image-large').alt=`${e.title}: три фазы движения`;$('#image-steps').innerHTML=e.steps.map(s=>`<li>${s}</li>`).join('');$('#image-cue').textContent=e.cue;updateImageAction();renderBusy();$('#image-dialog').showModal();renderUndo();renderBusy();}
+ if(b.dataset.image){const e=byId[b.dataset.image]||stretchById[b.dataset.image];imageExercise=e.id;$('#image-title').textContent=e.title;$('#image-large').src=`./media/${e.id}.webp`;$('#image-large').alt=`${e.title}: три фазы движения`;$('#image-steps').innerHTML=e.steps.map(s=>`<li>${s}</li>`).join('');$('#image-cue').textContent=e.cue;$('#image-easier-text').textContent=e.easier;updateImageAction();renderBusy();$('#image-dialog').showModal();renderUndo();renderBusy();}
  if(b.hasAttribute('data-stretch-next')||b.hasAttribute('data-stretch-skip'))renderBusy();
  if(b.id==='menu-open'){mobileSidebar=!mobileSidebar;document.body.classList.toggle('sidebar-open',mobileSidebar);b.setAttribute('aria-expanded',String(mobileSidebar));$('.sidebar').inert=!mobileSidebar;$('#main').inert=mobileSidebar;$('.mobile-nav').inert=mobileSidebar;if(mobileSidebar)$('#brand').focus({preventScroll:true});}
  if(b.id==='sidebar-backdrop')closeSidebar(true);

@@ -5,7 +5,7 @@ export function addDays(date,n){const d=new Date(date+'T12:00:00Z');d.setUTCDate
 export function weekStart(date){const d=new Date(date+'T12:00:00Z');return addDays(date,-((d.getUTCDay()+6)%7));}
 export function dayIndex(date){return (new Date(date+'T12:00:00Z').getUTCDay()+6)%7;}
 export const summary=strengthProgress;
-export function estimatedMinutes(plan){return Math.round(5+(plan?.items||[]).reduce((n,i)=>n+i.sets*(40+i.rest)/60,0));}
+export {estimateLabel,estimateHint} from './workout-time.js';
 export const formatDate=(date,options={day:'numeric',month:'long'})=>new Date(date+'T12:00:00Z').toLocaleDateString('ru-RU',{...options,timeZone:'UTC'});
 export const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 

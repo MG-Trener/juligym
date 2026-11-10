@@ -478,3 +478,38 @@ Edit supplied glute bridge illustration. Preserve SAME bridge movement, number o
 ### core03
 
 Edit the supplied exercise illustration. Preserve same woman, sage sports clothing, dark charcoal background and THREE full-body poses in a single HORIZONTAL row. Correct side plank to easier KNEE SUPPORTED version in ALL three panels. Left: side lying, left forearm and left bent knee on mat, hips just resting. Middle: raise hips, left forearm and LEFT BENT KNEE stay on mat, top right leg bent resting above lower leg, torso straight shoulder to knee; NO full straight leg side plank. Right gently lower hips, knees remain bent. Coral side abdomen muscles. No text or arrows.
+
+
+## Package 3 · 10 November 2026
+
+Built-in image_gen, individual three-phase assets. Reviewed before WebP encoding. The first dead-bug edit retained an ambiguous side view and was rejected; the accepted version uses an overhead view to show opposite limbs.
+
+### chest01
+
+Saved: `media/chest01.webp`.
+
+Use case: scientific-educational. Correct this exercise illustration for a beginner home workout website. Keep the same adult woman in sage green sports clothes, white trainers, dark charcoal studio background, realistic 3D instructional rendering, subtle coral muscle overlays, and landscape 1536x1024 composition. Exactly THREE equally wide phases left-to-right, full body visible, consistent scale. No text, letters, numbers, logos, arrows, extra people, or cropped limbs. This is an edit of the referenced target image. Wall push-up. Keep the same start / bent-elbow midpoint / return sequence. CORRECTION: REMOVE ALL muscle coloring from thighs, calves and legs; they must be plain green fabric. Highlight only pectoral muscles through the top, back of upper arms (triceps), and small anterior shoulder area. Whole body is a straight inclined line, shoulders away from ears, palms shoulder-width at chest height, elbows diagonally close to ribs. Phase 1 arms nearly straight; phase 2 controlled bend brings chest toward wall while hips align with torso; phase 3 same position as phase 1. Do not change outfit or setting.
+
+### core04
+
+Saved: `media/core04.webp`.
+
+Use case: scientific-educational. Correct this exercise illustration for a beginner home workout website. Keep the same adult woman in sage green sports clothes, white trainers, dark charcoal studio background, realistic 3D instructional rendering, subtle coral muscle overlays, and landscape 1536x1024 composition. Exactly THREE equally wide phases left-to-right, full body visible, consistent scale. No text, letters, numbers, logos, arrows, extra people, or cropped limbs. This is an edit of the referenced target image. Small abdominal crunch, three phases, side three-quarter view. CORRECTION: in BOTH left and right panels the back of the head AND shoulder blades are resting fully on the mat, face looks up, neck relaxed. Knees bent, feet planted throughout. Middle panel ONLY: raise shoulder blades just a few centimetres in a short crunch, NOT a sit-up. Pelvis and lower back remain settled on mat, arms reach toward knees without pulling the head. Highlight abdominal wall only, strongest in middle phase. Preserve three distinct separated panels.
+
+### core06
+
+Saved: `media/core06.webp`.
+
+Use case: scientific-educational. Create a precise instructional 3D exercise illustration: DEAD BUG, contralateral arm and leg, exactly three equal vertical panels side by side on a landscape 1536x1024 dark charcoal canvas. Consistent adult woman with auburn hair bun, sage green sports bra and leggings, white trainers, charcoal mat, coral overlay ONLY over abdominal muscles. Show the woman lying supine in each panel. IMPORTANT CAMERA: overhead three-quarter view looking down from near the feet, body aligned vertically inside each panel with feet toward TOP edge and head toward BOTTOM edge. Do not use a side view. The two sides of the body must be visibly separated. LEFT PANEL START: both knees bent 90 degrees above hips, shins level, both arms straight up toward ceiling, head rests on mat. CENTER PANEL MOVEMENT: the arm on the LEFT side of the image reaches beyond the head toward BOTTOM-LEFT; the leg on the RIGHT side of the image straightens forward toward TOP-RIGHT, hovering above mat. These extended limbs MUST be on DIAGONALLY OPPOSITE sides of the body. The leg on LEFT side of image remains knee-bent 90 degrees over hip; arm on RIGHT side remains up toward ceiling. No rotation of pelvis, no lifted head. RIGHT PANEL FINISH: return both knees over hips and both arms toward ceiling, matching start. EXACTLY TWO ARMS AND TWO LEGS in every panel. No text, arrows, numbering or diagrams. Readable anatomy is more important than decoration. All limbs remain within each separate panel.
+
+### stretch-sphinx
+
+Saved: `media/stretch-sphinx.webp`.
+
+Use case: scientific-educational. Correct this exercise illustration for a beginner home workout website. Keep the same adult woman in sage green sports clothes, white trainers, dark charcoal studio background, realistic 3D instructional rendering, subtle coral muscle overlays, and landscape 1536x1024 composition. Exactly THREE equally wide phases left-to-right, full body visible, consistent scale. No text, letters, numbers, logos, arrows, extra people, or cropped limbs. This is an edit of the referenced target image. Low sphinx stretch on belly, side view. CORRECTION: THREE genuinely different stages. Left: lying prone, forehead gently on mat, chest down, forearms on mat beside head with elbows forward of shoulders. Middle: lift chest a small comfortable amount supported on forearms, elbows still forward of shoulders, long neck, head follows spine, hips thighs feet stay on mat. No straight-arm cobra and no deep backbend. Right: slowly lowered back to the same prone rest as the left, forehead and chest on mat again. Highlight only front abdominal wall gently in middle, not low back. Show entire body and all forearms.
+
+### stretch-biceps-wall
+
+Saved: `media/stretch-biceps-wall.webp`.
+
+Use case: scientific-educational. Correct this exercise illustration for a beginner home workout website. Keep the same adult woman in sage green sports clothes, white trainers, dark charcoal studio background, realistic 3D instructional rendering, subtle coral muscle overlays, and landscape 1536x1024 composition. Exactly THREE equally wide phases left-to-right, full body visible, consistent scale. No text, letters, numbers, logos, arrows, extra people, or cropped limbs. This is an edit of the referenced target image. Gentle biceps stretch at wall, three phases. CORRECTION: in left and middle panels the wall-side arm reaches back at a height BELOW shoulder, ELBOW ALMOST STRAIGHT with only a slight soft bend, palm touching wall, upper arm and forearm nearly form one line. Do not show a 90-degree bent elbow. Left: stand side-on near wall, establish palm contact without stretch. Middle: make a small turn of chest away from the contacting straight arm, shoulders down, wrist comfortable, no forcing. Right: release hand and lower both arms to sides with normal relaxed standing posture. Highlight the front of upper arm (biceps) only in middle phase, no legs. Keep same woman and dark studio style; show the same wall in each panel.

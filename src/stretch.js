@@ -6,6 +6,7 @@ import {stretchExercise} from './day-settings.js';
 
 import {stretchSteps,sessionResult} from './session-progress.js';
 import {today,escape as esc} from './state.js';
+import {estimateLabel} from './workout-time.js';
 
 const resumeKey='juligym2:stretch-session-v1';
 const selectionKey = 'juligym2:stretch-selection';
@@ -19,16 +20,8 @@ function movementCount(count) {
   return `${count} ${word}`;
 }
 
-function duration(exercise) {
-  return exercise.seconds || exercise.repetitions * 5;
-}
-
 function minutes(ids) {
-  const seconds = ids.reduce((total, id) => {
-    const exercise = stretchById[id];
-    return total + duration(exercise) * (exercise.unilateral ? 2 : 1) + 15;
-  }, 0);
-  return `≈ ${Math.max(1, Math.round(seconds / 60))} мин`;
+  return estimateLabel({stretch_ids:ids});
 }
 
 function exerciseCard(exercise, selected, openTechnique, side = 0) {
@@ -37,7 +30,7 @@ function exerciseCard(exercise, selected, openTechnique, side = 0) {
   const category = exercise.seconds ? 'Растяжка' : 'Подвижность';
   const quantity = exercise.seconds ? `${exercise.seconds} с` : `${exercise.repetitions} плавных повторов`;
   const dose = `${quantity}${exercise.unilateral ? ' на сторону' : ''}`;
-  const technique = `<ol>${exercise.steps.map(step => `<li>${step}</li>`).join('')}</ol><p>${exercise.cue}</p>`;
+  const technique = `<ol>${exercise.steps.map(step => `<li>${step}</li>`).join('')}</ol><p>${exercise.cue}</p><p class="easier-tip"><b>Как сделать легче</b>${exercise.easier}</p>`;
   return `<article class="exercise-card stretch-card">
     <header><div><h3>${exercise.title}</h3><p>${exercise.muscles}</p></div><span class="difficulty">${category}</span></header>
     <button class="exercise-art" data-image="${exercise.id}" aria-label="Увеличить иллюстрацию: ${exercise.title}">
@@ -45,7 +38,7 @@ function exerciseCard(exercise, selected, openTechnique, side = 0) {
     </button>
     <div class="phase-labels">${exercise.phases.map((phase, index) => `<div><b>${index + 1}</b><span>${phase}</span></div>`).join('')}</div>
     <div class="stretch-meta"><span>${icon('clock')} ${dose}</span><span>${exercise.equipment}</span></div>
-    <details class="technique" data-technique="${hintId}" ${openTechnique === hintId ? 'open' : ''}><summary>${icon('info')} Техника и подсказка</summary>${technique}</details>
+    <details class="technique" data-technique="${hintId}" ${openTechnique === hintId ? 'open' : ''}><summary>${icon('info')} Техника · как сделать легче</summary>${technique}</details>
     ${guided ? '' : `<button class="button secondary stretch-add" data-stretch-add="${exercise.id}" aria-pressed="${selected}">${icon(selected ? 'check' : 'plus')} ${selected ? 'В подборке' : 'В мою подборку'}</button>`}
   </article>`;
 }

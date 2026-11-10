@@ -9,7 +9,7 @@ try{
  let page=await context.newPage();await page.goto(base);await enter(page);await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('сохранено в Neon'));
  await page.evaluate(()=>navigator.serviceWorker.ready);
  const cache=await page.evaluate(async()=>{const names=(await caches.keys()).filter(n=>n.startsWith('juligym-access-'));return (await(await caches.open(names[0])).keys()).length;});
- assert.equal(cache,144);
+ assert.equal(cache,145);
  const cdp=await context.newCDPSession(page);await cdp.send('Page.enable');const install=await cdp.send('Page.getInstallabilityErrors');assert.deepEqual(install.installabilityErrors,[]);
  assert.equal(await page.locator('#today-view').isVisible(),true);await page.locator('.mobile-nav [data-view=day]').click();
  await page.locator('#day-templates').click();

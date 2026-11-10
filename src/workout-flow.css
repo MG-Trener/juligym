@@ -36,6 +36,9 @@
 .day-summary p, .day-note { color: var(--muted); font-size: 13px; }
 .day-note { margin: 8px 0 0; }
 .day-template-heading { margin-top:18px; }
+.time-note { display:block; color:var(--muted); font-size:12px; line-height:1.5; }
+.easier-tip { padding:10px 12px; border-left:2px solid var(--accent); background:#b8f23809; line-height:1.6; }
+.easier-tip b { display:block; color:var(--accent); margin-bottom:4px; }
 .day-template-heading h3 { font-size:19px; }
 .day-template-heading .day-note { margin-top:5px; line-height:1.5; }
 .day-list h3 small { font-size:12px; font-weight:400; }

@@ -1,7 +1,7 @@
 import {sessionResult,stretchProgress} from './session-progress.js';
 import {byId} from './catalog.js';
 import {anatomy, icon} from './icons.js';
-import {escape as esc, estimatedMinutes, firstPendingSet, formatDate, summary, todaySelection} from './state.js';
+import {escape as esc, estimateLabel, estimateHint, firstPendingSet, formatDate, summary, todaySelection} from './state.js';
 
 const numberForm = new Intl.PluralRules('ru');
 const approachNouns = {one:'подход', few:'подхода', many:'подходов'};
@@ -26,19 +26,21 @@ export function todayMarkup(data, date) {
   let main;
   if (items.length) {
     const label = session?.finished_at ? (session.result_status==='partial'?'Частично выполнено':'Выполнено') : session ? 'В процессе' : 'По расписанию';
-    const estimate = session?.finished_at ? `${Math.max(1, Math.round(session.duration_seconds / 60))} мин` : `≈ ${estimatedMinutes({items})} мин`;
+    const estimate = `По плану ${estimateLabel(session||plan)}`;
     const next = pending ? `${byId[pending.item.id].title} · подход ${pending.setIndex + 1} из ${pending.item.sets}${pending.side?' · '+(pending.side===1?'левая сторона':'правая сторона'):''}` : 'Все подходы отмечены';
     main = `<div class="today-card today-featured">
       ${anatomy(byId[items[0].id]?.group, 'today-anatomy')}
       <span class="eyebrow">${label}</span>
       <h2>${esc(title)}</h2>
       <p class="flow-meta">${icon('clock')} ${estimate}<span aria-hidden="true">·</span>${progress.total} ${approachNouns[numberForm.select(progress.total)]}${stretchIds.length?' · растяжка после':''}</p>
+      ${!session?.finished_at?`<small class="time-note">${estimateHint(session||plan)}</small>`:''}
       ${session ? `<p class="today-next">${session.finished_at ? 'Сохранено в дневнике' : next}</p>${progressBar(progress)}<small>${savedApproaches(progress)}</small>` : ''}
       <div class="flow-actions">${todayAction(date, session?.plan_id || plan.id, session?.finished_at ? 'Посмотреть занятие' : session ? 'Продолжить' : 'Начать тренировку', !!session?.finished_at)}</div>
     </div>`;
   } else if(stretchIds.length){
     main = `<div class="today-card today-featured"><span class="eyebrow">${session?.finished_at?(session.result_status==='partial'?'Частично выполнено':'Выполнено'):session?'В процессе':'По расписанию'}</span>
-      <h2>Растяжка · ${esc(title)}</h2><p>Движений в плане: ${stretchIds.length}${session&&(!session.finished_at||session.result_summary)?` · выполнено шагов: ${stretchProgress(session).done} из ${stretchProgress(session).total}`:''}</p>
+      <h2>Растяжка · ${esc(title)}</h2><p>По плану ${estimateLabel(session||plan)} · движений: ${stretchIds.length}${session&&(!session.finished_at||session.result_summary)?` · выполнено шагов: ${stretchProgress(session).done} из ${stretchProgress(session).total}`:''}</p>
+      ${!session?.finished_at?`<small class="time-note">${estimateHint(session||plan)}</small>`:''}
       <div class="flow-actions"><button class="button primary flow-primary" data-day-start ${session?.finished_at?'':'data-write'} data-workout-date="${date}" data-workout-plan="${esc(session?.plan_id||plan.id)}">${icon('play')} ${session?.finished_at?'Посмотреть результат':session?'Продолжить':'Начать растяжку'}</button></div></div>`;
   } else {
     main = `<div class="today-card">
